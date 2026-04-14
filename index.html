@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Best Ball Golf</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green-deep: #1a3a2a;
+    --green-mid:  #2d5a3d;
+    --green-light:#3d7a52;
+    --gold:       #c9a84c;
+    --gold-light: #e8c97a;
+    --cream:      #f5f0e8;
+    --cream-dark: #ede6d6;
+    --white:      #ffffff;
+    --text-dark:  #1a1a1a;
+    --text-mid:   #4a4a4a;
+    --red:        #c0392b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--green-deep);
+    color: var(--cream);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 16px 60px;
+  }
+
+  header {
+    text-align: center;
+    padding: 40px 0 30px;
+    border-bottom: 1px solid rgba(201,168,76,0.3);
+    margin-bottom: 24px;
+  }
+
+  .header-badge {
+    display: inline-block;
+    background: var(--gold);
+    color: var(--green-deep);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 3px;
+    padding: 4px 14px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(32px, 8vw, 56px);
+    font-weight: 900;
+    color: var(--cream);
+    line-height: 1;
+    letter-spacing: -1px;
+  }
+
+  h1 span { color: var(--gold); font-style: italic; }
+
+  .subtitle {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: rgba(245,240,232,0.5);
+    margin-top: 10px;
+    text-transform: uppercase;
+  }
+
+  .status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(201,168,76,0.2);
+    padding: 10px 16px;
+    margin-bottom: 20px;
+    font-size: 11px;
+    letter-spacing: 1px;
+  }
+
+  .status-live {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--gold);
+    text-transform: uppercase;
+  }
+
+  .pulse {
+    width: 8px; height: 8px;
+    background: var(--gold);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50%      { opacity:.4; transform:scale(.8); }
+  }
+
+  .last-updated { color: rgba(245,240,232,0.4); font-size: 10px; }
+
+  /* Tabs */
+  .round-tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid rgba(201,168,76,0.2);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;        /* Firefox */
+    -ms-overflow-style: none;     /* IE/Edge */
+  }
+
+  .round-tabs::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+
+  .round-tab {
+    background: none;
+    border: none;
+    color: rgba(245,240,232,0.4);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 10px 18px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .round-tab:hover { color: var(--cream); }
+  .round-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+  .round-tab.overall { color: rgba(201,168,76,0.6); }
+  .round-tab.overall.active { color: var(--gold-light); border-bottom-color: var(--gold-light); }
+
+  /* Search */
+  .search-wrap { position: relative; margin-bottom: 16px; }
+
+  .search-wrap input {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(201,168,76,0.2);
+    color: var(--cream);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    padding: 12px 16px 12px 40px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .search-wrap input::placeholder { color: rgba(245,240,232,0.3); }
+  .search-wrap input:focus { border-color: var(--gold); }
+  .search-icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:rgba(245,240,232,0.3); font-size:14px; }
+
+  /* Table wrapper for horizontal scroll */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Leaderboard */
+  .leaderboard { display: flex; flex-direction: column; gap: 2px; min-width: 900px; }
+
+  .lb-header {
+    display: grid;
+    grid-template-columns: 52px 56px 180px 58px 52px repeat(18, 1fr);
+    padding: 8px 12px;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(201,168,76,0.7);
+    border-bottom: 1px solid rgba(201,168,76,0.2);
+  }
+
+  /* Overall leaderboard has fewer columns */
+  .lb-header.overall-header {
+    grid-template-columns: 52px 56px 180px 80px 80px 80px 80px 100px;
+  }
+
+  .lb-row {
+    display: grid;
+    grid-template-columns: 52px 56px 180px 58px 52px repeat(18, 1fr);
+    padding: 0 12px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .lb-row.overall-row {
+    grid-template-columns: 52px 56px 180px 80px 80px 80px 80px 100px;
+    cursor: default;
+  }
+
+  .lb-row:hover { background: rgba(255,255,255,0.06); border-color: rgba(201,168,76,0.15); }
+  .lb-row.expanded { background: rgba(255,255,255,0.06); border-color: rgba(201,168,76,0.3); }
+  .lb-row.top-3 { background: rgba(201,168,76,0.07); }
+  .lb-row.top-3:hover { background: rgba(201,168,76,0.12); }
+
+  .lb-cell {
+    display: flex;
+    align-items: center;
+    padding: 13px 2px;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .lb-cell.rank { font-size:11px; color:rgba(245,240,232,0.5); }
+  .lb-cell.rank.gold { color:var(--gold); }
+
+  .lb-cell.name {
+    font-family: 'Playfair Display', serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--cream);
+    padding-left: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .lb-cell.hole-score {
+    font-size: 10px;
+    justify-content: center;
+    color: rgba(245,240,232,0.55);
+  }
+
+  .lb-cell.hole-score.birdie { color: #5dade2; }
+  .lb-cell.hole-score.eagle  { color: var(--gold); font-weight:500; }
+  .lb-cell.hole-score.bogey  { color: #e67e73; }
+  .lb-cell.hole-score.double { color: var(--red); }
+  .lb-cell.hole-score.empty  { color: rgba(245,240,232,0.15); }
+
+  .lb-cell.total { font-size:13px; font-weight:500; justify-content:center; color:var(--cream); }
+  .lb-cell.total.under { color:#5dade2; }
+  .lb-cell.total.over  { color:#e67e73; }
+
+  .lb-cell.thru  { font-size:10px; color:rgba(245,240,232,0.4); justify-content:center; }
+  .lb-cell.pct   { font-size:10px; color:rgba(201,168,76,0.7); justify-content:center; }
+
+  .lb-cell.round-col { font-size:12px; font-weight:500; justify-content:center; }
+  .lb-cell.round-col.under { color:#5dade2; }
+  .lb-cell.round-col.over  { color:#e67e73; }
+
+  .lb-cell.overall-total {
+    font-size:15px; font-weight:700; justify-content:center;
+    font-family: 'Playfair Display', serif;
+  }
+  .lb-cell.overall-total.under { color:#5dade2; }
+  .lb-cell.overall-total.over  { color:#e67e73; }
+
+  /* Expanded detail */
+  .lb-detail {
+    display: none;
+    background: rgba(0,0,0,0.2);
+    border-top: 1px solid rgba(201,168,76,0.15);
+    padding: 14px 12px;
+    min-width: 960px;
+  }
+
+  .lb-row.expanded + .lb-detail { display: block; }
+
+  .golfer-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+
+  @media (max-width: 600px) {
+    .golfer-cards { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .golfer-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 12px;
+  }
+
+  .golfer-card.best {
+    border-color: rgba(201,168,76,0.4);
+    background: rgba(201,168,76,0.07);
+  }
+
+  .gc-tier  { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:rgba(245,240,232,0.4); margin-bottom:4px; }
+  .gc-name  { font-family:'Playfair Display',serif; font-size:13px; font-weight:700; color:var(--cream); margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .gc-score { font-size:18px; font-weight:500; }
+  .gc-score.under { color:#5dade2; }
+  .gc-score.over  { color:#e67e73; }
+  .gc-badge  { font-size:9px; letter-spacing:1px; color:var(--gold); text-transform:uppercase; margin-top:4px; }
+  .gc-thru   { font-size:11px; color:rgba(245,240,232,0.4); margin-left:6px; font-weight:300; }
+
+  .golfer-card { cursor: pointer; }
+  .gc-expand-icon { font-size:9px; color:rgba(245,240,232,0.35); margin-left:4px; transition:transform 0.2s; display:inline-block; }
+  .gc-expand-icon.open { transform: rotate(90deg); }
+
+  .gc-holes {
+    margin-top: 10px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    padding-top: 10px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .gh-table {
+    display: grid;
+    grid-template-rows: repeat(3, auto);
+    grid-auto-flow: column;
+    gap: 0;
+    min-width: max-content;
+  }
+
+  .gh-header { display: contents; }
+
+  .gh-label {
+    font-size: 8px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(201,168,76,0.6);
+    padding: 0 8px 4px 0;
+    white-space: nowrap;
+  }
+
+  .gh-hole {
+    color: rgba(245,240,232,0.4);
+    font-size: 10px;
+    padding: 3px 8px 3px 0;
+    text-align: center;
+  }
+
+  .gh-per {
+    font-size: 11px;
+    padding: 3px 8px 3px 0;
+    text-align: center;
+  }
+
+  .gh-run {
+    font-size: 10px;
+    padding: 3px 8px 3px 0;
+    text-align: center;
+    color: rgba(245,240,232,0.5);
+  }
+
+  .state-msg { text-align:center; padding:60px 20px; color:rgba(245,240,232,0.5); font-size:13px; letter-spacing:1px; }
+  .spinner { width:32px; height:32px; border:2px solid rgba(201,168,76,0.2); border-top-color:var(--gold); border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto 16px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .no-data-badge {
+    display: inline-block;
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 3px 10px;
+    background: rgba(255,255,255,0.06);
+    color: rgba(245,240,232,0.4);
+    margin-left: 8px;
+    vertical-align: middle;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="header-badge">⛳ Masters Tournament 2026</div>
+    <h1>Best Ball <span>Golf</span></h1>
+    <div class="subtitle">Best ball pool — low score counts</div>
+  </header>
+
+  <div class="status-bar">
+    <div class="status-live"><div class="pulse"></div><span>Live</span></div>
+    <div class="last-updated" id="lastUpdated">Loading…</div>
+  </div>
+
+  <div class="round-tabs">
+    <button class="round-tab overall" onclick="setTab('overall')" id="tab-overall">Overall</button>
+    <button class="round-tab active" onclick="setTab('r1')" id="tab-r1">Round 1</button>
+    <button class="round-tab"        onclick="setTab('r2')" id="tab-r2">Round 2</button>
+    <button class="round-tab"        onclick="setTab('r3')" id="tab-r3">Round 3</button>
+    <button class="round-tab"        onclick="setTab('r4')" id="tab-r4">Round 4</button>
+  </div>
+
+  <div class="search-wrap">
+    <span class="search-icon">⌕</span>
+    <input type="text" id="searchInput" placeholder="Search team…" oninput="renderLeaderboard()">
+  </div>
+
+  <div class="table-scroll">
+    <div id="appContent">
+      <div class="state-msg"><div class="spinner"></div>Loading scores…</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────────────────
+const SHEET_ID   = '1PsimowW5sNKwpBgeRpleKNx2qtAWaIqUj38sv04nxBc';
+const TF_GID     = '381899354';
+const SS_GID     = '420411120';
+const MASTERS_FEED = 'https://www.masters.com/en_US/scores/feeds/2026/scores.json';
+const PARS = [4,5,4,3,4,3,4,5,4,4,4,3,5,4,5,3,4,4];
+
+// ── STATE ───────────────────────────────────────────────────────────────────
+let currentTab  = 'r1';
+let tfPicks     = [];   // [{name, golfers:[g1,g2,g3,g4]}]
+let ssPicks     = [];
+let mastersData = {};   // full_name → {r1:[18 scores], r2, r3, r4}
+let expandedRow = null;
+
+// ── FETCH ───────────────────────────────────────────────────────────────────
+async function fetchSheetJSON(gid) {
+  const url  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${gid}`;
+  const res  = await fetch(url);
+  const text = await res.text();
+  const json = JSON.parse(text.substring(47).slice(0, -2));
+  return json.table;
+}
+
+async function fetchMasters() {
+  const res  = await fetch(MASTERS_FEED);
+  const data = await res.json();
+  const out  = {};
+  for (const p of (data.data?.player || [])) {
+    out[p.full_name] = {
+      r1: p.round1?.scores || [],
+      r2: p.round2?.scores || [],
+      r3: p.round3?.scores || [],
+      r4: p.round4?.scores || [],
+      teetimes: {
+        r1: p.round1?.teetime || '',
+        r2: p.round2?.teetime || '',
+        r3: p.round3?.teetime || '',
+        r4: p.round4?.teetime || '',
+      },
+    };
+  }
+  return out;
+}
+
+// ── PARSE PICKS ─────────────────────────────────────────────────────────────
+function parsePicks(table) {
+  if (!table?.rows) return [];
+  return table.rows
+    .map(row => {
+      const c   = row.c || [];
+      const get = i => c[i]?.v?.toString().trim() || '';
+      const name = get(2);
+      if (!name) return null;
+      return { name, golfers: [get(3), get(4), get(5), get(6)].filter(Boolean) };
+    })
+    .filter(Boolean);
+}
+
+// ── SCORE HELPERS ────────────────────────────────────────────────────────────
+// Normalize a name to plain ASCII for fuzzy matching
+// e.g. "Højgaard" → "hojgaard", "Åberg" → "aberg"
+function normalizeName(str) {
+  return str
+    .toLowerCase()
+    .normalize('NFD')                    // decompose accents
+    .replace(/[̀-ͯ]/g, '')     // strip accent marks
+    .replace(/ø/g, 'o').replace(/Ø/g, 'o')
+    .replace(/æ/g, 'ae').replace(/Æ/g, 'ae')
+    .replace(/ð/g, 'd').replace(/þ/g, 'th')
+    .replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9 ]/g, '')         // strip anything remaining
+    .trim();
+}
+
+function findGolfer(name) {
+  if (!name) return null;
+  const nl = normalizeName(name);
+  // Try exact normalized match first
+  let match = Object.keys(mastersData).find(k => normalizeName(k) === nl);
+  if (match) return match;
+  // Try last name match
+  const lastName = nl.split(' ').pop();
+  match = Object.keys(mastersData).find(k => normalizeName(k).includes(lastName));
+  return match || null;
+}
+
+// Returns array of 18 per-hole scores vs par (null = not played)
+function holeScoreVsPar(golferName, roundKey) {
+  const key = findGolfer(golferName);
+  if (!key) return Array(18).fill(null);
+  const scores = mastersData[key]?.[roundKey] || [];
+  const result = Array(18).fill(null);
+  let started = false;
+  for (let i = 0; i < 18; i++) {
+    if (scores[i] !== null && scores[i] !== undefined) {
+      result[i] = scores[i] - PARS[i];
+      started = true;
+    } else if (started) break;
+  }
+  return result;
+}
+
+// Returns running cumulative to-par from an array of per-hole vs-par values
+function runningToPar(golferName, roundKey) {
+  const perHole = holeScoreVsPar(golferName, roundKey);
+  const result  = Array(18).fill(null);
+  let cum = 0, started = false;
+  for (let i = 0; i < 18; i++) {
+    if (perHole[i] !== null) {
+      cum += perHole[i];
+      result[i] = cum;
+      started = true;
+    } else if (started) break;
+  }
+  return result;
+}
+
+// Best ball per hole: take lowest per-hole vs-par score among 4 golfers,
+// then build a running cumulative total across all 18 holes.
+function bestBall(golfers, roundKey) {
+  const allPerHole = golfers.map(g => holeScoreVsPar(g, roundKey));
+
+  // Step 1: best (lowest) score vs par on each individual hole
+  const bestPerHole = Array.from({length:18}, (_,h) => {
+    const vals = allPerHole.map(r => r[h]).filter(v => v !== null);
+    return vals.length ? Math.min(...vals) : null;
+  });
+
+  // Step 2: convert to running cumulative total
+  const result = Array(18).fill(null);
+  let cum = 0, started = false;
+  for (let i = 0; i < 18; i++) {
+    if (bestPerHole[i] !== null) {
+      cum += bestPerHole[i];
+      result[i] = cum;
+      started = true;
+    } else if (started) break;
+  }
+  return result;
+}
+
+// Final score = last non-null value in best ball array
+function finalScore(bb) {
+  const played = bb.filter(v => v !== null);
+  return played.length ? played[played.length-1] : null;
+}
+
+function holesThru(bb) { return bb.filter(v => v !== null).length; }
+
+// ── OVERALL ─────────────────────────────────────────────────────────────────
+// Merge TF and SS picks by name, sum all 4 round best balls
+function buildOverall() {
+  // Build lookup from SS picks
+  const ssMap = {};
+  ssPicks.forEach(t => { ssMap[t.name] = t.golfers; });
+
+  // Use TF picks as the base (all entrants played TF)
+  return tfPicks.map(tf => {
+    const ssGolfers = ssMap[tf.name] || [];
+    const r1bb = bestBall(tf.golfers, 'r1');
+    const r2bb = bestBall(tf.golfers, 'r2');
+    const r3bb = bestBall(ssGolfers.length ? ssGolfers : tf.golfers, 'r3');
+    const r4bb = bestBall(ssGolfers.length ? ssGolfers : tf.golfers, 'r4');
+    const r1 = finalScore(r1bb);
+    const r2 = finalScore(r2bb);
+    const r3 = finalScore(r3bb);
+    const r4 = finalScore(r4bb);
+    const rounds = [r1, r2, r3, r4];
+    const total  = rounds.some(v => v !== null)
+      ? rounds.reduce((s, v) => s + (v ?? 0), 0)
+      : null;
+    // Overall % = total holes played across all rounds / (72 * rounds that have started)
+    const tfGolfers = tf.golfers;
+    const ssGolfers2 = ssMap[tf.name] ? ssMap[tf.name] : tf.golfers;
+    const holesPlayed = ['r1','r2'].reduce((s,rk) => s + tfGolfers.reduce((ss,g) => ss + holeScoreVsPar(g,rk).filter(v=>v!==null).length, 0), 0)
+                      + ['r3','r4'].reduce((s,rk) => s + ssGolfers2.reduce((ss,g) => ss + holeScoreVsPar(g,rk).filter(v=>v!==null).length, 0), 0);
+    const pct = holesPlayed > 0 ? Math.round((holesPlayed / (72*4)) * 100) : 0;
+    return { name: tf.name, r1, r2, r3, r4, total, pct };
+  });
+}
+
+// ── FORMAT ───────────────────────────────────────────────────────────────────
+const fmtScore = v => v === null ? '—' : v === 0 ? 'E' : v > 0 ? '+'+v : ''+v;
+const fmtHole  = v => v === null ? '·' : v === 0 ? 'E' : v > 0 ? '+'+v : ''+v;
+const totalCls = v => v === null ? '' : v < 0 ? 'under' : v > 0 ? 'over' : '';
+
+function holeCls(val, prevVal) {
+  if (val === null) return 'empty';
+  const diff = prevVal === null ? val : val - prevVal; // stroke diff on this hole
+  if (diff <= -2) return 'eagle';
+  if (diff === -1) return 'birdie';
+  if (diff === 0)  return '';
+  if (diff === 1)  return 'bogey';
+  return 'double';
+}
+
+// ── RENDER ───────────────────────────────────────────────────────────────────
+function setTab(tab) {
+  currentTab  = tab;
+  expandedRow = null;
+  document.querySelectorAll('.round-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  renderLeaderboard();
+}
+
+function toggleExpand(idx) {
+  expandedRow = expandedRow === idx ? null : idx;
+  renderLeaderboard();
+}
+
+function renderLeaderboard() {
+  const search = (document.getElementById('searchInput')?.value || '').toLowerCase();
+
+  if (currentTab === 'overall') {
+    renderOverall(search);
+  } else {
+    renderRound(currentTab, search);
+  }
+}
+
+function renderRound(roundKey, search) {
+  // Picks to use
+  const picks = ['r1','r2'].includes(roundKey) ? tfPicks : ssPicks;
+
+  if (!picks.length) {
+    document.getElementById('appContent').innerHTML =
+      `<div class="state-msg">No picks available yet for this round.<br><small style="opacity:.5">S&S picks will appear once selections are made tonight.</small></div>`;
+    return;
+  }
+
+  let rows = picks.map(team => {
+    const bb         = bestBall(team.golfers, roundKey);
+    const total      = finalScore(bb);
+    const thru       = holesThru(bb);
+    // % of round completed = total holes played across all 4 golfers / 72
+    const totalHoles = team.golfers.reduce((sum, g) => {
+      const ph = holeScoreVsPar(g, roundKey);
+      return sum + ph.filter(v => v !== null).length;
+    }, 0);
+    const pct = totalHoles > 0 ? Math.round((totalHoles / 72) * 100) : 0;
+    return { team, bb, total, thru, pct };
+  });
+
+  rows.sort((a,b) => {
+    if (a.total===null && b.total===null) return 0;
+    if (a.total===null) return 1;
+    if (b.total===null) return -1;
+    if (a.total !== b.total) return a.total - b.total;
+    // Tiebreaker: work backwards from hole 18
+    for (let h = 17; h >= 0; h--) {
+      const aBest = bestBallPerHole(a.team.golfers, roundKey, h);
+      const bBest = bestBallPerHole(b.team.golfers, roundKey, h);
+      if (aBest === null && bBest === null) continue;
+      if (aBest === null) return 1;
+      if (bBest === null) return -1;
+      if (aBest !== bBest) return aBest - bBest;
+    }
+    return 0;
+  });
+
+  // Assign ranks — only show T if tiebreaker also couldn't separate
+  let rank = 1;
+  rows.forEach((r,i) => {
+    if (i > 0 && r.total !== rows[i-1].total) rank = i+1;
+    r.rankNum = rank;
+    r.rankLabel = r.total===null ? '—' : rank===1 ? '1st' : rank===2 ? '2nd' : rank===3 ? '3rd' : 'T'+rank;
+  });
+
+  if (search) rows = rows.filter(r => r.team.name.toLowerCase().includes(search));
+
+  const roundLabel = {r1:'Round 1 — Thursday', r2:'Round 2 — Friday', r3:'Round 3 — Saturday', r4:'Round 4 — Sunday'}[roundKey];
+  const holeNums   = Array.from({length:18},(_,i)=>i+1);
+
+  let html = `
+  <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,0.6);margin-bottom:12px;">${roundLabel}</div>
+  <div class="leaderboard">
+    <div class="lb-header">
+      <div class="lb-cell">POS</div>
+      <div class="lb-cell" style="justify-content:center">%</div>
+      <div class="lb-cell" style="padding-left:6px">TEAM</div>
+      <div class="lb-cell" style="justify-content:center">TOT</div>
+      <div class="lb-cell" style="justify-content:center">THRU</div>
+      ${holeNums.map(h=>`<div class="lb-cell" style="justify-content:center;font-size:9px">${h}</div>`).join('')}
+    </div>`;
+
+  rows.forEach((r, idx) => {
+    const isTop3     = r.rankNum <= 3 && r.total !== null;
+    const isExpanded = expandedRow === idx;
+    // per-hole class needs prev value
+    const holeCells  = r.bb.map((v,i) => {
+      const prev = i===0 ? null : r.bb[i-1];
+      return `<div class="lb-cell hole-score ${holeCls(v,prev)}">${fmtHole(v)}</div>`;
+    }).join('');
+
+    html += `
+    <div class="lb-row ${isTop3?'top-3':''} ${isExpanded?'expanded':''}" onclick="toggleExpand(${idx})">
+      <div class="lb-cell rank ${r.rankNum<=3&&r.total!==null?'gold':''}">${r.rankLabel}</div>
+      <div class="lb-cell pct">${r.pct>0?r.pct+'%':'—'}</div>
+      <div class="lb-cell name">${r.team.name}</div>
+      <div class="lb-cell total ${totalCls(r.total)}">${fmtScore(r.total)}</div>
+      <div class="lb-cell thru">${r.thru>0?r.thru:'—'}</div>
+      ${holeCells}
+    </div>
+    <div class="lb-detail">
+      <div class="golfer-cards">
+        ${r.team.golfers.map((g,gi) => {
+          const gRun    = runningToPar(g, roundKey);
+          const gPerHole= holeScoreVsPar(g, roundKey);
+          const played  = gRun.filter(v=>v!==null);
+          const gScore  = played.length ? played[played.length-1] : null;
+          const isBest  = r.bb.some((v,i) => v!==null && gRun[i]===v);
+          const cardId  = `gc-${idx}-${gi}`;
+
+          // Build hole-by-hole columns for this golfer (horizontal layout)
+          const playedHoles = Array.from({length:18}, (_,h) => {
+            const perHole = gPerHole[h];
+            const running = gRun[h];
+            return { h, perHole, running };
+          }).filter(({running, perHole}) => running !== null || perHole !== null);
+
+          const holeCols = playedHoles.map(({h, perHole, running}) => {
+            const cls = perHole===null?'':'hole-score '+(perHole<=-2?'eagle':perHole===-1?'birdie':perHole===0?'':perHole===1?'bogey':'double');
+            const fmtP = perHole===null?'·':perHole===0?'E':perHole>0?'+'+perHole:''+perHole;
+            const fmtR = running===null?'·':running===0?'E':running>0?'+'+running:''+running;
+            return `<span class="gh-hole">${h+1}</span>
+              <span class="gh-per ${cls}">${fmtP}</span>
+              <span class="gh-run ${totalCls(running)}">${fmtR}</span>`;
+          }).join('');
+
+          const holeRows = playedHoles.length ? `
+            <div class="gh-table">
+              <span class="gh-label">Hole</span>
+              <span class="gh-label">Score</span>
+              <span class="gh-label">Total</span>
+              ${holeCols}
+            </div>` : '<div style="font-size:10px;opacity:.5;padding:6px 0">No data yet</div>';
+
+          const gThru    = played.length;
+          const teetime  = getTeetime(g, roundKey);
+          const thruLabel = gThru === 18 ? 'F' : gThru > 0 ? 'Thru ' + gThru : teetime ? teetime + ' EDT' : 'NS';
+
+          return `
+          <div class="golfer-card ${isBest?'best':''}" onclick="toggleGolfer('${cardId}')">
+            <div class="gc-tier">Tier ${gi+1}</div>
+            <div class="gc-name">${g||'—'} <span class="gc-expand-icon" id="icon-${cardId}">▸</span></div>
+            <div class="gc-score ${totalCls(gScore)}">${fmtScore(gScore)} <span class="gc-thru">${thruLabel}</span></div>
+            ${isBest?'<div class="gc-badge">★ Best ball</div>':''}
+            <div class="gc-holes" id="${cardId}" style="display:none">
+              <div class="gh-header">
+                <span class="gh-hole">HOLE</span>
+                <span class="gh-per">SCORE</span>
+                <span class="gh-run">TOTAL</span>
+              </div>
+              ${holeRows || '<div style="font-size:10px;opacity:.5;padding:6px 0">No data yet</div>'}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  });
+
+  html += '</div>';
+  if (!rows.length) html = '<div class="state-msg">No teams found.</div>';
+  document.getElementById('appContent').innerHTML = html;
+}
+
+function renderOverall(search) {
+  let rows = buildOverall();
+
+  rows.sort((a,b) => {
+    if (a.total===null && b.total===null) return 0;
+    if (a.total===null) return 1;
+    if (b.total===null) return -1;
+    return a.total - b.total;
+  });
+
+  let rank = 1;
+  rows.forEach((r,i) => {
+    if (i>0 && r.total !== rows[i-1].total) rank = i+1;
+    r.rankNum  = rank;
+    r.rankLabel = r.total===null ? '—' : rank===1?'1st':rank===2?'2nd':rank===3?'3rd':'T'+rank;
+  });
+
+  if (search) rows = rows.filter(r => r.name.toLowerCase().includes(search));
+
+  let html = `
+  <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,0.6);margin-bottom:12px;">Overall Standings</div>
+  <div class="leaderboard">
+    <div class="lb-header overall-header">
+      <div class="lb-cell">POS</div>
+      <div class="lb-cell" style="justify-content:center">%</div>
+      <div class="lb-cell" style="padding-left:6px">TEAM</div>
+      <div class="lb-cell" style="justify-content:center">R1</div>
+      <div class="lb-cell" style="justify-content:center">R2</div>
+      <div class="lb-cell" style="justify-content:center">R3</div>
+      <div class="lb-cell" style="justify-content:center">R4</div>
+      <div class="lb-cell" style="justify-content:center">TOTAL</div>
+    </div>`;
+
+  rows.forEach(r => {
+    const isTop3 = r.rankNum<=3 && r.total!==null;
+    html += `
+    <div class="lb-row overall-row ${isTop3?'top-3':''}">
+      <div class="lb-cell rank ${r.rankNum<=3&&r.total!==null?'gold':''}">${r.rankLabel}</div>
+      <div class="lb-cell pct">${r.pct>0?r.pct+'%':'—'}</div>
+      <div class="lb-cell name">${r.name}</div>
+      <div class="lb-cell round-col ${totalCls(r.r1)}">${fmtScore(r.r1)}</div>
+      <div class="lb-cell round-col ${totalCls(r.r2)}">${fmtScore(r.r2)}</div>
+      <div class="lb-cell round-col ${totalCls(r.r3)}">${fmtScore(r.r3)}</div>
+      <div class="lb-cell round-col ${totalCls(r.r4)}">${fmtScore(r.r4)}</div>
+      <div class="lb-cell overall-total ${totalCls(r.total)}">${fmtScore(r.total)}</div>
+    </div>`;
+  });
+
+  html += '</div>';
+  if (!rows.length) html = '<div class="state-msg">No teams found.</div>';
+  document.getElementById('appContent').innerHTML = html;
+}
+
+// Get tee time for a golfer in a given round
+function getTeetime(golferName, roundKey) {
+  const key = findGolfer(golferName);
+  if (!key) return '';
+  return mastersData[key]?.teetimes?.[roundKey] || '';
+}
+
+// Returns the best (lowest) per-hole vs-par score for a team on a single hole
+function bestBallPerHole(golfers, roundKey, holeIdx) {
+  const vals = golfers.map(g => {
+    const ph = holeScoreVsPar(g, roundKey);
+    return ph[holeIdx];
+  }).filter(v => v !== null);
+  return vals.length ? Math.min(...vals) : null;
+}
+
+// ── GOLFER EXPAND ────────────────────────────────────────────────────────────
+function toggleGolfer(cardId) {
+  event.stopPropagation(); // don't collapse the team row
+  const el   = document.getElementById(cardId);
+  const icon = document.getElementById('icon-' + cardId);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  el.style.display   = isOpen ? 'none' : 'block';
+  if (icon) icon.classList.toggle('open', !isOpen);
+}
+
+// Detect which round is currently in progress based on Masters feed data
+function detectCurrentRound() {
+  for (let r = 4; r >= 1; r--) {
+    const key = 'r' + r;
+    // Check if any player has scores in this round
+    const hasData = Object.values(mastersData).some(p =>
+      (p[key] || []).some(s => s !== null && s !== undefined)
+    );
+    if (hasData) return r;
+  }
+  return null;
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const [tfTable, ssTable, masters] = await Promise.all([
+      fetchSheetJSON(TF_GID),
+      fetchSheetJSON(SS_GID),
+      fetchMasters(),
+    ]);
+
+    tfPicks     = parsePicks(tfTable);
+    ssPicks     = parsePicks(ssTable);
+    mastersData = masters;
+
+    document.getElementById('lastUpdated').textContent =
+      'Updated ' + new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+
+    // Auto-detect current round from Masters data, fall back to Overall
+    const currentRoundNum = detectCurrentRound();
+    if (currentRoundNum) {
+      currentTab = 'r' + currentRoundNum;
+      document.querySelectorAll('.round-tab').forEach(t => t.classList.remove('active'));
+      document.getElementById('tab-r' + currentRoundNum).classList.add('active');
+    } else {
+      currentTab = 'overall';
+      document.querySelectorAll('.round-tab').forEach(t => t.classList.remove('active'));
+      document.getElementById('tab-overall').classList.add('active');
+    }
+
+    renderLeaderboard();
+
+    // Auto-refresh every 5 minutes
+    setInterval(async () => {
+      mastersData = await fetchMasters();
+      document.getElementById('lastUpdated').textContent =
+        'Updated ' + new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+      renderLeaderboard();
+    }, 5 * 60 * 1000);
+
+  } catch(e) {
+    console.error(e);
+    document.getElementById('appContent').innerHTML =
+      `<div class="state-msg">⚠ Could not load data.<br><br>
+      Make sure your Google Sheet is set to <strong>Anyone with the link → Viewer</strong>.<br><br>
+      <small style="opacity:.5">${e.message}</small></div>`;
+  }
+}
+
+init();
+</script>
+</body>
+</html>
