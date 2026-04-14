@@ -5,503 +5,155 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Best Ball Golf</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --green-deep: #1a3a2a;
-    --green-mid:  #2d5a3d;
-    --green-light:#3d7a52;
-    --gold:       #c9a84c;
-    --gold-light: #e8c97a;
-    --cream:      #f5f0e8;
-    --cream-dark: #ede6d6;
-    --white:      #ffffff;
-    --text-dark:  #1a1a1a;
-    --text-mid:   #4a4a4a;
-    --red:        #c0392b;
-  }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js';
+import { getAuth, signInWithEmailAndPassword, signInAnonymously, signOut, onAuthStateChanged }
+  from 'https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js';
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, where, serverTimestamp }
+  from 'https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js';
 
-  body {
-    background: var(--green-deep);
-    color: var(--cream);
-    font-family: 'DM Mono', monospace;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
+// ── FIREBASE CONFIG ──────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyDIoiNbpsoPCzUa0S9DLTUt1Hvcv_9gNWo",
+  authDomain: "bestball-golf.firebaseapp.com",
+  databaseURL: "https://bestball-golf-default-rtdb.firebaseio.com",
+  projectId: "bestball-golf",
+  storageBucket: "bestball-golf.firebasestorage.app",
+  messagingSenderId: "396784385904",
+  appId: "1:396784385904:web:b86531af1ed89c6c7719b5",
+  measurementId: "G-57K94VFQRQ"
+};
 
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-    pointer-events: none;
-    z-index: 0;
-  }
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
 
-  .container {
-    position: relative;
-    z-index: 1;
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 0 16px 60px;
-  }
-
-  header {
-    text-align: center;
-    padding: 40px 0 30px;
-    border-bottom: 1px solid rgba(201,168,76,0.3);
-    margin-bottom: 24px;
-  }
-
-  .header-badge {
-    display: inline-block;
-    background: var(--gold);
-    color: var(--green-deep);
-    font-size: 10px;
-    font-weight: 500;
-    letter-spacing: 3px;
-    padding: 4px 14px;
-    text-transform: uppercase;
-    margin-bottom: 14px;
-  }
-
-  h1 {
-    font-family: 'Playfair Display', serif;
-    font-size: clamp(32px, 8vw, 56px);
-    font-weight: 900;
-    color: var(--cream);
-    line-height: 1;
-    letter-spacing: -1px;
-  }
-
-  h1 span { color: var(--gold); font-style: italic; }
-
-  .subtitle {
-    font-size: 11px;
-    letter-spacing: 2px;
-    color: rgba(245,240,232,0.5);
-    margin-top: 10px;
-    text-transform: uppercase;
-  }
-
-  .status-bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(201,168,76,0.2);
-    padding: 10px 16px;
-    margin-bottom: 20px;
-    font-size: 11px;
-    letter-spacing: 1px;
-  }
-
-  .status-live {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--gold);
-    text-transform: uppercase;
-  }
-
-  .pulse {
-    width: 8px; height: 8px;
-    background: var(--gold);
-    border-radius: 50%;
-    animation: pulse 2s infinite;
-  }
-
-  @keyframes pulse {
-    0%,100% { opacity:1; transform:scale(1); }
-    50%      { opacity:.4; transform:scale(.8); }
-  }
-
-  .last-updated { color: rgba(245,240,232,0.4); font-size: 10px; }
-
-  /* Tabs */
-  .round-tabs {
-    display: flex;
-    gap: 2px;
-    margin-bottom: 20px;
-    border-bottom: 1px solid rgba(201,168,76,0.2);
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;        /* Firefox */
-    -ms-overflow-style: none;     /* IE/Edge */
-  }
-
-  .round-tabs::-webkit-scrollbar { display: none; } /* Chrome/Safari */
-
-  .round-tab {
-    background: none;
-    border: none;
-    color: rgba(245,240,232,0.4);
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    padding: 10px 18px;
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    transition: all 0.2s;
-    white-space: nowrap;
-  }
-
-  .round-tab:hover { color: var(--cream); }
-  .round-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
-  .round-tab.overall { color: rgba(201,168,76,0.6); }
-  .round-tab.overall.active { color: var(--gold-light); border-bottom-color: var(--gold-light); }
-
-  /* Search */
-  .search-wrap { position: relative; margin-bottom: 16px; }
-
-  .search-wrap input {
-    width: 100%;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(201,168,76,0.2);
-    color: var(--cream);
-    font-family: 'DM Mono', monospace;
-    font-size: 13px;
-    padding: 12px 16px 12px 40px;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-
-  .search-wrap input::placeholder { color: rgba(245,240,232,0.3); }
-  .search-wrap input:focus { border-color: var(--gold); }
-  .search-icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:rgba(245,240,232,0.3); font-size:14px; }
-
-  /* Table wrapper for horizontal scroll */
-  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-
-  /* Leaderboard */
-  .leaderboard { display: flex; flex-direction: column; gap: 2px; min-width: 900px; }
-
-  .lb-header {
-    display: grid;
-    grid-template-columns: 52px 56px 180px 58px 52px repeat(18, 1fr);
-    padding: 8px 12px;
-    font-size: 9px;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    color: rgba(201,168,76,0.7);
-    border-bottom: 1px solid rgba(201,168,76,0.2);
-  }
-
-  /* Overall leaderboard has fewer columns */
-  .lb-header.overall-header {
-    grid-template-columns: 52px 56px 180px 80px 80px 80px 80px 100px;
-  }
-
-  .lb-row {
-    display: grid;
-    grid-template-columns: 52px 56px 180px 58px 52px repeat(18, 1fr);
-    padding: 0 12px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid transparent;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-
-  .lb-row.overall-row {
-    grid-template-columns: 52px 56px 180px 80px 80px 80px 80px 100px;
-    cursor: default;
-  }
-
-  .lb-row:hover { background: rgba(255,255,255,0.06); border-color: rgba(201,168,76,0.15); }
-  .lb-row.expanded { background: rgba(255,255,255,0.06); border-color: rgba(201,168,76,0.3); }
-  .lb-row.top-3 { background: rgba(201,168,76,0.07); }
-  .lb-row.top-3:hover { background: rgba(201,168,76,0.12); }
-
-  .lb-cell {
-    display: flex;
-    align-items: center;
-    padding: 13px 2px;
-    font-size: 11px;
-    white-space: nowrap;
-    overflow: hidden;
-  }
-
-  .lb-cell.rank { font-size:11px; color:rgba(245,240,232,0.5); }
-  .lb-cell.rank.gold { color:var(--gold); }
-
-  .lb-cell.name {
-    font-family: 'Playfair Display', serif;
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--cream);
-    padding-left: 6px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .lb-cell.hole-score {
-    font-size: 10px;
-    justify-content: center;
-    color: rgba(245,240,232,0.55);
-  }
-
-  .lb-cell.hole-score.birdie { color: #5dade2; }
-  .lb-cell.hole-score.eagle  { color: var(--gold); font-weight:500; }
-  .lb-cell.hole-score.bogey  { color: #e67e73; }
-  .lb-cell.hole-score.double { color: var(--red); }
-  .lb-cell.hole-score.empty  { color: rgba(245,240,232,0.15); }
-
-  .lb-cell.total { font-size:13px; font-weight:500; justify-content:center; color:var(--cream); }
-  .lb-cell.total.under { color:#5dade2; }
-  .lb-cell.total.over  { color:#e67e73; }
-
-  .lb-cell.thru  { font-size:10px; color:rgba(245,240,232,0.4); justify-content:center; }
-  .lb-cell.pct   { font-size:10px; color:rgba(201,168,76,0.7); justify-content:center; }
-
-  .lb-cell.round-col { font-size:12px; font-weight:500; justify-content:center; }
-  .lb-cell.round-col.under { color:#5dade2; }
-  .lb-cell.round-col.over  { color:#e67e73; }
-
-  .lb-cell.overall-total {
-    font-size:15px; font-weight:700; justify-content:center;
-    font-family: 'Playfair Display', serif;
-  }
-  .lb-cell.overall-total.under { color:#5dade2; }
-  .lb-cell.overall-total.over  { color:#e67e73; }
-
-  /* Expanded detail */
-  .lb-detail {
-    display: none;
-    background: rgba(0,0,0,0.2);
-    border-top: 1px solid rgba(201,168,76,0.15);
-    padding: 14px 12px;
-    min-width: 960px;
-  }
-
-  .lb-row.expanded + .lb-detail { display: block; }
-
-  .golfer-cards {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-  }
-
-  @media (max-width: 600px) {
-    .golfer-cards { grid-template-columns: repeat(2, 1fr); }
-  }
-
-  .golfer-card {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    padding: 12px;
-  }
-
-  .golfer-card.best {
-    border-color: rgba(201,168,76,0.4);
-    background: rgba(201,168,76,0.07);
-  }
-
-  .gc-tier  { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:rgba(245,240,232,0.4); margin-bottom:4px; }
-  .gc-name  { font-family:'Playfair Display',serif; font-size:13px; font-weight:700; color:var(--cream); margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .gc-score { font-size:18px; font-weight:500; }
-  .gc-score.under { color:#5dade2; }
-  .gc-score.over  { color:#e67e73; }
-  .gc-badge  { font-size:9px; letter-spacing:1px; color:var(--gold); text-transform:uppercase; margin-top:4px; }
-  .gc-thru   { font-size:11px; color:rgba(245,240,232,0.4); margin-left:6px; font-weight:300; }
-
-  .golfer-card { cursor: pointer; }
-  .gc-expand-icon { font-size:9px; color:rgba(245,240,232,0.35); margin-left:4px; transition:transform 0.2s; display:inline-block; }
-  .gc-expand-icon.open { transform: rotate(90deg); }
-
-  .gc-holes {
-    margin-top: 10px;
-    border-top: 1px solid rgba(255,255,255,0.08);
-    padding-top: 10px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .gh-table {
-    display: grid;
-    grid-template-rows: repeat(3, auto);
-    grid-auto-flow: column;
-    gap: 0;
-    min-width: max-content;
-  }
-
-  .gh-header { display: contents; }
-
-  .gh-label {
-    font-size: 8px;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    color: rgba(201,168,76,0.6);
-    padding: 0 8px 4px 0;
-    white-space: nowrap;
-  }
-
-  .gh-hole {
-    color: rgba(245,240,232,0.4);
-    font-size: 10px;
-    padding: 3px 8px 3px 0;
-    text-align: center;
-  }
-
-  .gh-per {
-    font-size: 11px;
-    padding: 3px 8px 3px 0;
-    text-align: center;
-  }
-
-  .gh-run {
-    font-size: 10px;
-    padding: 3px 8px 3px 0;
-    text-align: center;
-    color: rgba(245,240,232,0.5);
-  }
-
-  .state-msg { text-align:center; padding:60px 20px; color:rgba(245,240,232,0.5); font-size:13px; letter-spacing:1px; }
-  .spinner { width:32px; height:32px; border:2px solid rgba(201,168,76,0.2); border-top-color:var(--gold); border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto 16px; }
-  @keyframes spin { to { transform:rotate(360deg); } }
-
-  .no-data-badge {
-    display: inline-block;
-    font-size: 10px;
-    letter-spacing: 1px;
-    padding: 3px 10px;
-    background: rgba(255,255,255,0.06);
-    color: rgba(245,240,232,0.4);
-    margin-left: 8px;
-    vertical-align: middle;
-    text-transform: uppercase;
-  }
-</style>
-</head>
-<body>
-<div class="container">
-
-  <header>
-    <div class="header-badge">⛳ Masters Tournament 2026</div>
-    <h1>Best Ball <span>Golf</span></h1>
-    <div class="subtitle">Best ball pool — low score counts</div>
-  </header>
-
-  <div class="status-bar">
-    <div class="status-live"><div class="pulse"></div><span>Live</span></div>
-    <div class="last-updated" id="lastUpdated">Loading…</div>
-  </div>
-
-  <div class="round-tabs">
-    <button class="round-tab overall" onclick="setTab('overall')" id="tab-overall">Overall</button>
-    <button class="round-tab active" onclick="setTab('r1')" id="tab-r1">Round 1</button>
-    <button class="round-tab"        onclick="setTab('r2')" id="tab-r2">Round 2</button>
-    <button class="round-tab"        onclick="setTab('r3')" id="tab-r3">Round 3</button>
-    <button class="round-tab"        onclick="setTab('r4')" id="tab-r4">Round 4</button>
-  </div>
-
-  <div class="search-wrap">
-    <span class="search-icon">⌕</span>
-    <input type="text" id="searchInput" placeholder="Search team…" oninput="renderLeaderboard()">
-  </div>
-
-  <div class="table-scroll">
-    <div id="appContent">
-      <div class="state-msg"><div class="spinner"></div>Loading scores…</div>
-    </div>
-  </div>
-
-</div>
-
-<script>
-// ── CONFIG ──────────────────────────────────────────────────────────────────
-const SHEET_ID   = '1PsimowW5sNKwpBgeRpleKNx2qtAWaIqUj38sv04nxBc';
-const TF_GID     = '381899354';
-const SS_GID     = '420411120';
-const MASTERS_FEED = 'https://www.masters.com/en_US/scores/feeds/2026/scores.json';
+// ── CONSTANTS ────────────────────────────────────────────────────────────────
+const ADMIN_EMAIL = 'SET_YOUR_ADMIN_EMAIL_HERE'; // e.g. 'you@gmail.com'
 const PARS = [4,5,4,3,4,3,4,5,4,4,4,3,5,4,5,3,4,4];
 
-// ── STATE ───────────────────────────────────────────────────────────────────
-let currentTab  = 'r1';
-let tfPicks     = [];   // [{name, golfers:[g1,g2,g3,g4]}]
-let ssPicks     = [];
-let mastersData = {};   // full_name → {r1:[18 scores], r2, r3, r4}
-let expandedRow = null;
+// ── STATE ────────────────────────────────────────────────────────────────────
+let state = {
+  view:         'home',      // home | leaderboard | picks | admin | archive
+  user:         null,
+  isAdmin:      false,
+  tournaments:  [],
+  activeTournament: null,
+  mastersData:  {},
+  picksData:    [],          // [{id, name, r1:[g1,g2,g3,g4], r2:[g1,g2,g3,g4]}]
+  currentTab:   'overall',
+  expandedRow:  null,
+  expandedGolfer: null,
+};
 
-// ── FETCH ───────────────────────────────────────────────────────────────────
-async function fetchSheetJSON(gid) {
-  const url  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${gid}`;
-  const res  = await fetch(url);
-  const text = await res.text();
-  const json = JSON.parse(text.substring(47).slice(0, -2));
-  return json.table;
-}
+// ── AUTH ─────────────────────────────────────────────────────────────────────
+onAuthStateChanged(auth, async user => {
+  state.user    = user;
+  state.isAdmin = user?.email === ADMIN_EMAIL;
+  render();
+});
 
-async function fetchMasters() {
-  const res  = await fetch(MASTERS_FEED);
-  const data = await res.json();
-  const out  = {};
-  for (const p of (data.data?.player || [])) {
-    out[p.full_name] = {
-      r1: p.round1?.scores || [],
-      r2: p.round2?.scores || [],
-      r3: p.round3?.scores || [],
-      r4: p.round4?.scores || [],
-      teetimes: {
-        r1: p.round1?.teetime || '',
-        r2: p.round2?.teetime || '',
-        r3: p.round3?.teetime || '',
-        r4: p.round4?.teetime || '',
-      },
-    };
+async function adminLogin(email, password) {
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch(e) {
+    alert('Login failed: ' + e.message);
   }
-  return out;
 }
 
-// ── PARSE PICKS ─────────────────────────────────────────────────────────────
-function parsePicks(table) {
-  if (!table?.rows) return [];
-  return table.rows
-    .map(row => {
-      const c   = row.c || [];
-      const get = i => c[i]?.v?.toString().trim() || '';
-      const name = get(2);
-      if (!name) return null;
-      return { name, golfers: [get(3), get(4), get(5), get(6)].filter(Boolean) };
-    })
-    .filter(Boolean);
+async function anonLogin() {
+  if (!state.user) await signInAnonymously(auth);
+}
+
+// ── ROUTER ───────────────────────────────────────────────────────────────────
+function navigate(view, data = {}) {
+  state.view        = view;
+  state.expandedRow = null;
+  if (data.tournament) state.activeTournament = data.tournament;
+  render();
+  if (view === 'leaderboard' && state.activeTournament) loadLeaderboard();
+  if (view === 'picks'       && state.activeTournament) loadPicks();
+  if (view === 'admin')                                  loadAdmin();
+  if (view === 'home')                                   loadHome();
+  if (view === 'archive')                                loadArchive();
+}
+
+// ── FIRESTORE HELPERS ────────────────────────────────────────────────────────
+async function getTournaments() {
+  const snap = await getDocs(query(collection(db, 'tournaments'), orderBy('startDate', 'desc')));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function getTournament(id) {
+  const snap = await getDoc(doc(db, 'tournaments', id));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+async function getPicks(tournamentId) {
+  const snap = await getDocs(collection(db, 'tournaments', tournamentId, 'picks'));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function savePick(tournamentId, pickId, data) {
+  if (pickId) {
+    await updateDoc(doc(db, 'tournaments', tournamentId, 'picks', pickId), data);
+  } else {
+    await addDoc(collection(db, 'tournaments', tournamentId, 'picks'), data);
+  }
+}
+
+// ── SCORE FETCH ──────────────────────────────────────────────────────────────
+async function fetchScores(tournament) {
+  if (!tournament?.scoreFeed) return {};
+  try {
+    const res  = await fetch(tournament.scoreFeed);
+    const data = await res.json();
+    const out  = {};
+    // Support Masters feed format
+    for (const p of (data.data?.player || [])) {
+      out[p.full_name] = {
+        r1: p.round1?.scores || [],
+        r2: p.round2?.scores || [],
+        r3: p.round3?.scores || [],
+        r4: p.round4?.scores || [],
+        teetimes: {
+          r1: p.round1?.teetime || '',
+          r2: p.round2?.teetime || '',
+          r3: p.round3?.teetime || '',
+          r4: p.round4?.teetime || '',
+        },
+      };
+    }
+    return out;
+  } catch(e) {
+    console.error('Score fetch failed', e);
+    return {};
+  }
 }
 
 // ── SCORE HELPERS ────────────────────────────────────────────────────────────
-// Normalize a name to plain ASCII for fuzzy matching
-// e.g. "Højgaard" → "hojgaard", "Åberg" → "aberg"
 function normalizeName(str) {
-  return str
-    .toLowerCase()
-    .normalize('NFD')                    // decompose accents
-    .replace(/[̀-ͯ]/g, '')     // strip accent marks
-    .replace(/ø/g, 'o').replace(/Ø/g, 'o')
-    .replace(/æ/g, 'ae').replace(/Æ/g, 'ae')
-    .replace(/ð/g, 'd').replace(/þ/g, 'th')
-    .replace(/ß/g, 'ss')
-    .replace(/[^a-z0-9 ]/g, '')         // strip anything remaining
-    .trim();
+  return str.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/ø/g,'o').replace(/æ/g,'ae').replace(/ð/g,'d').replace(/þ/g,'th').replace(/ß/g,'ss')
+    .replace(/[^a-z0-9 ]/g,'').trim();
 }
 
 function findGolfer(name) {
   if (!name) return null;
   const nl = normalizeName(name);
-  // Try exact normalized match first
-  let match = Object.keys(mastersData).find(k => normalizeName(k) === nl);
+  let match = Object.keys(state.mastersData).find(k => normalizeName(k) === nl);
   if (match) return match;
-  // Try last name match
-  const lastName = nl.split(' ').pop();
-  match = Object.keys(mastersData).find(k => normalizeName(k).includes(lastName));
-  return match || null;
+  const last = nl.split(' ').pop();
+  return Object.keys(state.mastersData).find(k => normalizeName(k).includes(last)) || null;
 }
 
-// Returns array of 18 per-hole scores vs par (null = not played)
 function holeScoreVsPar(golferName, roundKey) {
   const key = findGolfer(golferName);
   if (!key) return Array(18).fill(null);
-  const scores = mastersData[key]?.[roundKey] || [];
+  const scores = state.mastersData[key]?.[roundKey] || [];
   const result = Array(18).fill(null);
   let started = false;
   for (let i = 0; i < 18; i++) {
@@ -513,258 +165,263 @@ function holeScoreVsPar(golferName, roundKey) {
   return result;
 }
 
-// Returns running cumulative to-par from an array of per-hole vs-par values
 function runningToPar(golferName, roundKey) {
   const perHole = holeScoreVsPar(golferName, roundKey);
   const result  = Array(18).fill(null);
   let cum = 0, started = false;
   for (let i = 0; i < 18; i++) {
-    if (perHole[i] !== null) {
-      cum += perHole[i];
-      result[i] = cum;
-      started = true;
-    } else if (started) break;
+    if (perHole[i] !== null) { cum += perHole[i]; result[i] = cum; started = true; }
+    else if (started) break;
   }
   return result;
 }
 
-// Best ball per hole: take lowest per-hole vs-par score among 4 golfers,
-// then build a running cumulative total across all 18 holes.
 function bestBall(golfers, roundKey) {
   const allPerHole = golfers.map(g => holeScoreVsPar(g, roundKey));
-
-  // Step 1: best (lowest) score vs par on each individual hole
   const bestPerHole = Array.from({length:18}, (_,h) => {
     const vals = allPerHole.map(r => r[h]).filter(v => v !== null);
     return vals.length ? Math.min(...vals) : null;
   });
-
-  // Step 2: convert to running cumulative total
   const result = Array(18).fill(null);
   let cum = 0, started = false;
   for (let i = 0; i < 18; i++) {
-    if (bestPerHole[i] !== null) {
-      cum += bestPerHole[i];
-      result[i] = cum;
-      started = true;
-    } else if (started) break;
+    if (bestPerHole[i] !== null) { cum += bestPerHole[i]; result[i] = cum; started = true; }
+    else if (started) break;
   }
   return result;
 }
 
-// Final score = last non-null value in best ball array
-function finalScore(bb) {
-  const played = bb.filter(v => v !== null);
-  return played.length ? played[played.length-1] : null;
+function bestBallPerHole(golfers, roundKey, holeIdx) {
+  const vals = golfers.map(g => holeScoreVsPar(g, roundKey)[holeIdx]).filter(v => v !== null);
+  return vals.length ? Math.min(...vals) : null;
 }
 
-function holesThru(bb) { return bb.filter(v => v !== null).length; }
-
-// ── OVERALL ─────────────────────────────────────────────────────────────────
-// Merge TF and SS picks by name, sum all 4 round best balls
-function buildOverall() {
-  // Build lookup from SS picks
-  const ssMap = {};
-  ssPicks.forEach(t => { ssMap[t.name] = t.golfers; });
-
-  // Use TF picks as the base (all entrants played TF)
-  return tfPicks.map(tf => {
-    const ssGolfers = ssMap[tf.name] || [];
-    const r1bb = bestBall(tf.golfers, 'r1');
-    const r2bb = bestBall(tf.golfers, 'r2');
-    const r3bb = bestBall(ssGolfers.length ? ssGolfers : tf.golfers, 'r3');
-    const r4bb = bestBall(ssGolfers.length ? ssGolfers : tf.golfers, 'r4');
-    const r1 = finalScore(r1bb);
-    const r2 = finalScore(r2bb);
-    const r3 = finalScore(r3bb);
-    const r4 = finalScore(r4bb);
-    const rounds = [r1, r2, r3, r4];
-    const total  = rounds.some(v => v !== null)
-      ? rounds.reduce((s, v) => s + (v ?? 0), 0)
-      : null;
-    // Overall % = total holes played across all rounds / (72 * rounds that have started)
-    const tfGolfers = tf.golfers;
-    const ssGolfers2 = ssMap[tf.name] ? ssMap[tf.name] : tf.golfers;
-    const holesPlayed = ['r1','r2'].reduce((s,rk) => s + tfGolfers.reduce((ss,g) => ss + holeScoreVsPar(g,rk).filter(v=>v!==null).length, 0), 0)
-                      + ['r3','r4'].reduce((s,rk) => s + ssGolfers2.reduce((ss,g) => ss + holeScoreVsPar(g,rk).filter(v=>v!==null).length, 0), 0);
-    const pct = holesPlayed > 0 ? Math.round((holesPlayed / (72*4)) * 100) : 0;
-    return { name: tf.name, r1, r2, r3, r4, total, pct };
-  });
+function finalScore(bb)  { const p = bb.filter(v=>v!==null); return p.length ? p[p.length-1] : null; }
+function holesThru(bb)   { return bb.filter(v=>v!==null).length; }
+function fmtScore(v)     { return v===null?'—':v===0?'E':v>0?'+'+v:''+v; }
+function fmtHole(v)      { return v===null?'·':v===0?'E':v>0?'+'+v:''+v; }
+function totalCls(v)     { return v===null?'':v<0?'under':v>0?'over':''; }
+function holeCls(val, prev) {
+  if (val===null) return 'empty';
+  const d = prev===null ? val : val-prev;
+  if (d<=-2) return 'eagle'; if (d===-1) return 'birdie';
+  if (d===0) return ''; if (d===1) return 'bogey'; return 'double';
 }
 
-// ── FORMAT ───────────────────────────────────────────────────────────────────
-const fmtScore = v => v === null ? '—' : v === 0 ? 'E' : v > 0 ? '+'+v : ''+v;
-const fmtHole  = v => v === null ? '·' : v === 0 ? 'E' : v > 0 ? '+'+v : ''+v;
-const totalCls = v => v === null ? '' : v < 0 ? 'under' : v > 0 ? 'over' : '';
-
-function holeCls(val, prevVal) {
-  if (val === null) return 'empty';
-  const diff = prevVal === null ? val : val - prevVal; // stroke diff on this hole
-  if (diff <= -2) return 'eagle';
-  if (diff === -1) return 'birdie';
-  if (diff === 0)  return '';
-  if (diff === 1)  return 'bogey';
-  return 'double';
+function detectCurrentRound() {
+  for (let r = 4; r >= 1; r--) {
+    const key = 'r' + r;
+    if (Object.values(state.mastersData).some(p => (p[key]||[]).some(s => s!==null && s!==undefined))) return r;
+  }
+  return null;
 }
 
-// ── RENDER ───────────────────────────────────────────────────────────────────
-function setTab(tab) {
-  currentTab  = tab;
-  expandedRow = null;
-  document.querySelectorAll('.round-tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('tab-' + tab).classList.add('active');
+function getTeetime(golferName, roundKey) {
+  const key = findGolfer(golferName);
+  if (!key) return '';
+  return state.mastersData[key]?.teetimes?.[roundKey] || '';
+}
+
+// ── VIEWS ────────────────────────────────────────────────────────────────────
+
+// HOME
+async function loadHome() {
+  showLoading('appRoot');
+  state.tournaments = await getTournaments();
+  renderHome();
+}
+
+function renderHome() {
+  const active   = state.tournaments.filter(t => t.status === 'active');
+  const archived = state.tournaments.filter(t => t.status === 'archived');
+  document.getElementById('appRoot').innerHTML = `
+    <div class="view-home">
+      ${active.length ? `
+        <div class="section-label">Current Tournament</div>
+        ${active.map(t => `
+          <div class="tournament-card active-card" onclick="navigate('leaderboard', {tournament: ${JSON.stringify(t).replace(/"/g,'&quot;')}})">
+            <div class="tc-badge">Live</div>
+            <div class="tc-name">${t.name}</div>
+            <div class="tc-dates">${t.dates || ''}</div>
+            <div class="tc-actions">
+              <button class="btn-gold" onclick="event.stopPropagation(); navigate('picks', {tournament: ${JSON.stringify(t).replace(/"/g,'&quot;')}})">Submit Picks</button>
+              <button class="btn-outline" onclick="event.stopPropagation(); navigate('leaderboard', {tournament: ${JSON.stringify(t).replace(/"/g,'&quot;')}})">Leaderboard →</button>
+            </div>
+          </div>`).join('')}
+      ` : `<div class="no-tournament">No active tournament.<br><small>Check back when the next event opens.</small></div>`}
+
+      ${archived.length ? `
+        <div class="section-label" style="margin-top:32px">Past Tournaments</div>
+        <div class="archive-list">
+          ${archived.map(t => `
+            <div class="archive-card" onclick="navigate('leaderboard', {tournament: ${JSON.stringify(t).replace(/"/g,'&quot;')}})">
+              <div>
+                <div class="ac-name">${t.name}</div>
+                <div class="ac-dates">${t.dates || ''}</div>
+              </div>
+              <div class="ac-arrow">→</div>
+            </div>`).join('')}
+        </div>` : ''}
+
+      ${state.isAdmin ? `
+        <div style="text-align:center; margin-top:40px">
+          <button class="btn-outline" onclick="navigate('admin')">⚙ Admin Panel</button>
+        </div>` : `
+        <div style="text-align:center; margin-top:40px">
+          <button class="btn-text" onclick="showAdminLogin()">Admin Login</button>
+        </div>`}
+    </div>`;
+}
+
+// LEADERBOARD
+async function loadLeaderboard() {
+  showLoading('appRoot');
+  const t = state.activeTournament;
+  state.mastersData = await fetchScores(t);
+  state.picksData   = await getPicks(t.id);
+
+  const r = detectCurrentRound();
+  state.currentTab = r ? 'r'+r : 'overall';
+
   renderLeaderboard();
-}
 
-function toggleExpand(idx) {
-  expandedRow = expandedRow === idx ? null : idx;
-  renderLeaderboard();
+  // Auto-refresh if active
+  if (t.status === 'active') {
+    if (window._refreshTimer) clearInterval(window._refreshTimer);
+    window._refreshTimer = setInterval(async () => {
+      state.mastersData = await fetchScores(t);
+      if (state.view === 'leaderboard') renderLeaderboard();
+    }, 5 * 60 * 1000);
+  }
 }
 
 function renderLeaderboard() {
-  const search = (document.getElementById('searchInput')?.value || '').toLowerCase();
+  const t = state.activeTournament;
+  const tabs = ['overall','r1','r2','r3','r4'];
+  const tabLabels = { overall:'Overall', r1:'Round 1', r2:'Round 2', r3:'Round 3', r4:'Round 4' };
 
-  if (currentTab === 'overall') {
-    renderOverall(search);
-  } else {
-    renderRound(currentTab, search);
-  }
+  const tabsHtml = tabs.map(tab => `
+    <button class="round-tab ${state.currentTab===tab?'active':''} ${tab==='overall'?'overall':''}"
+      onclick="setTab('${tab}')">${tabLabels[tab]}</button>`).join('');
+
+  const boardHtml = state.currentTab === 'overall'
+    ? buildOverallBoard()
+    : buildRoundBoard(state.currentTab);
+
+  document.getElementById('appRoot').innerHTML = `
+    <div class="view-leaderboard">
+      <div class="view-header">
+        <button class="back-btn" onclick="navigate('home')">← Back</button>
+        <div class="view-title">${t.name}</div>
+        <div class="view-sub">${t.dates || ''}</div>
+      </div>
+      <div class="status-bar">
+        <div class="status-live"><div class="pulse"></div><span>${t.status==='active'?'Live':'Final'}</span></div>
+        <div class="last-updated">Updated ${new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
+      </div>
+      <div class="round-tabs">${tabsHtml}</div>
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input type="text" id="searchInput" placeholder="Search team…" oninput="renderLeaderboard()">
+      </div>
+      <div class="table-scroll">${boardHtml}</div>
+    </div>`;
 }
 
-function renderRound(roundKey, search) {
-  // Picks to use
-  const picks = ['r1','r2'].includes(roundKey) ? tfPicks : ssPicks;
+function buildRoundBoard(roundKey) {
+  const t      = state.activeTournament;
+  const isWeekend = ['r3','r4'].includes(roundKey);
+  const search = (document.getElementById('searchInput')?.value||'').toLowerCase();
+  const roundLabels = {r1:'Round 1 — Thursday',r2:'Round 2 — Friday',r3:'Round 3 — Saturday',r4:'Round 4 — Sunday'};
 
-  if (!picks.length) {
-    document.getElementById('appContent').innerHTML =
-      `<div class="state-msg">No picks available yet for this round.<br><small style="opacity:.5">S&S picks will appear once selections are made tonight.</small></div>`;
-    return;
-  }
-
-  let rows = picks.map(team => {
-    const bb         = bestBall(team.golfers, roundKey);
-    const total      = finalScore(bb);
-    const thru       = holesThru(bb);
-    // % of round completed = total holes played across all 4 golfers / 72
-    const totalHoles = team.golfers.reduce((sum, g) => {
-      const ph = holeScoreVsPar(g, roundKey);
-      return sum + ph.filter(v => v !== null).length;
-    }, 0);
-    const pct = totalHoles > 0 ? Math.round((totalHoles / 72) * 100) : 0;
-    return { team, bb, total, thru, pct };
+  let rows = state.picksData.map(pick => {
+    const golfers = isWeekend ? (pick.r2golfers||pick.r1golfers||[]) : (pick.r1golfers||[]);
+    const bb      = bestBall(golfers, roundKey);
+    const total   = finalScore(bb);
+    const thru    = holesThru(bb);
+    const totalH  = golfers.reduce((s,g) => s + holeScoreVsPar(g,roundKey).filter(v=>v!==null).length, 0);
+    const pct     = totalH > 0 ? Math.round((totalH/72)*100) : 0;
+    return { pick, golfers, bb, total, thru, pct };
   });
 
   rows.sort((a,b) => {
     if (a.total===null && b.total===null) return 0;
-    if (a.total===null) return 1;
-    if (b.total===null) return -1;
+    if (a.total===null) return 1; if (b.total===null) return -1;
     if (a.total !== b.total) return a.total - b.total;
-    // Tiebreaker: work backwards from hole 18
-    for (let h = 17; h >= 0; h--) {
-      const aBest = bestBallPerHole(a.team.golfers, roundKey, h);
-      const bBest = bestBallPerHole(b.team.golfers, roundKey, h);
-      if (aBest === null && bBest === null) continue;
-      if (aBest === null) return 1;
-      if (bBest === null) return -1;
-      if (aBest !== bBest) return aBest - bBest;
+    for (let h=17;h>=0;h--) {
+      const av = bestBallPerHole(a.golfers, roundKey, h);
+      const bv = bestBallPerHole(b.golfers, roundKey, h);
+      if (av===null && bv===null) continue;
+      if (av===null) return 1; if (bv===null) return -1;
+      if (av!==bv) return av-bv;
     }
     return 0;
   });
 
-  // Assign ranks — only show T if tiebreaker also couldn't separate
-  let rank = 1;
+  let rank=1;
   rows.forEach((r,i) => {
-    if (i > 0 && r.total !== rows[i-1].total) rank = i+1;
+    if (i>0 && r.total!==rows[i-1].total) rank=i+1;
     r.rankNum = rank;
-    r.rankLabel = r.total===null ? '—' : rank===1 ? '1st' : rank===2 ? '2nd' : rank===3 ? '3rd' : 'T'+rank;
+    r.rankLabel = r.total===null?'—':rank===1?'1st':rank===2?'2nd':rank===3?'3rd':'T'+rank;
   });
 
-  if (search) rows = rows.filter(r => r.team.name.toLowerCase().includes(search));
+  if (search) rows = rows.filter(r => r.pick.name.toLowerCase().includes(search));
+  const holeNums = Array.from({length:18},(_,i)=>i+1);
 
-  const roundLabel = {r1:'Round 1 — Thursday', r2:'Round 2 — Friday', r3:'Round 3 — Saturday', r4:'Round 4 — Sunday'}[roundKey];
-  const holeNums   = Array.from({length:18},(_,i)=>i+1);
-
-  let html = `
-  <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,0.6);margin-bottom:12px;">${roundLabel}</div>
+  let html = `<div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,0.6);margin-bottom:12px;">${roundLabels[roundKey]}</div>
   <div class="leaderboard">
     <div class="lb-header">
-      <div class="lb-cell">POS</div>
-      <div class="lb-cell" style="justify-content:center">%</div>
+      <div class="lb-cell">POS</div><div class="lb-cell" style="justify-content:center">%</div>
       <div class="lb-cell" style="padding-left:6px">TEAM</div>
       <div class="lb-cell" style="justify-content:center">TOT</div>
       <div class="lb-cell" style="justify-content:center">THRU</div>
       ${holeNums.map(h=>`<div class="lb-cell" style="justify-content:center;font-size:9px">${h}</div>`).join('')}
     </div>`;
 
-  rows.forEach((r, idx) => {
-    const isTop3     = r.rankNum <= 3 && r.total !== null;
-    const isExpanded = expandedRow === idx;
-    // per-hole class needs prev value
-    const holeCells  = r.bb.map((v,i) => {
-      const prev = i===0 ? null : r.bb[i-1];
-      return `<div class="lb-cell hole-score ${holeCls(v,prev)}">${fmtHole(v)}</div>`;
-    }).join('');
+  rows.forEach((r,idx) => {
+    const isTop3     = r.rankNum<=3 && r.total!==null;
+    const isExpanded = state.expandedRow===idx;
+    const holeCells  = r.bb.map((v,i)=>`<div class="lb-cell hole-score ${holeCls(v,r.bb[i-1]??null)}">${fmtHole(v)}</div>`).join('');
 
     html += `
     <div class="lb-row ${isTop3?'top-3':''} ${isExpanded?'expanded':''}" onclick="toggleExpand(${idx})">
       <div class="lb-cell rank ${r.rankNum<=3&&r.total!==null?'gold':''}">${r.rankLabel}</div>
       <div class="lb-cell pct">${r.pct>0?r.pct+'%':'—'}</div>
-      <div class="lb-cell name">${r.team.name}</div>
+      <div class="lb-cell name">${r.pick.name}</div>
       <div class="lb-cell total ${totalCls(r.total)}">${fmtScore(r.total)}</div>
       <div class="lb-cell thru">${r.thru>0?r.thru:'—'}</div>
       ${holeCells}
     </div>
     <div class="lb-detail">
       <div class="golfer-cards">
-        ${r.team.golfers.map((g,gi) => {
+        ${r.golfers.map((g,gi) => {
           const gRun    = runningToPar(g, roundKey);
-          const gPerHole= holeScoreVsPar(g, roundKey);
+          const gPerH   = holeScoreVsPar(g, roundKey);
           const played  = gRun.filter(v=>v!==null);
           const gScore  = played.length ? played[played.length-1] : null;
-          const isBest  = r.bb.some((v,i) => v!==null && gRun[i]===v);
+          const gThru   = played.length;
+          const teetime = getTeetime(g, roundKey);
+          const thruLbl = gThru===18?'F':gThru>0?'Thru '+gThru:teetime?teetime+' EDT':'NS';
+          const isBest  = r.bb.some((v,i)=>v!==null && runningToPar(g,roundKey)[i]===v);
           const cardId  = `gc-${idx}-${gi}`;
-
-          // Build hole-by-hole columns for this golfer (horizontal layout)
-          const playedHoles = Array.from({length:18}, (_,h) => {
-            const perHole = gPerHole[h];
-            const running = gRun[h];
-            return { h, perHole, running };
-          }).filter(({running, perHole}) => running !== null || perHole !== null);
-
-          const holeCols = playedHoles.map(({h, perHole, running}) => {
-            const cls = perHole===null?'':'hole-score '+(perHole<=-2?'eagle':perHole===-1?'birdie':perHole===0?'':perHole===1?'bogey':'double');
-            const fmtP = perHole===null?'·':perHole===0?'E':perHole>0?'+'+perHole:''+perHole;
-            const fmtR = running===null?'·':running===0?'E':running>0?'+'+running:''+running;
+          const playedH = Array.from({length:18},(_,h)=>({h,p:gPerH[h],r:gRun[h]})).filter(x=>x.r!==null||x.p!==null);
+          const holeCols = playedH.map(({h,p,r:rv})=>{
+            const cls = p===null?'':p<=-2?'eagle':p===-1?'birdie':p===0?'':p===1?'bogey':'double';
             return `<span class="gh-hole">${h+1}</span>
-              <span class="gh-per ${cls}">${fmtP}</span>
-              <span class="gh-run ${totalCls(running)}">${fmtR}</span>`;
+              <span class="gh-per ${cls}">${p===null?'·':p===0?'E':p>0?'+'+p:''+p}</span>
+              <span class="gh-run ${totalCls(rv)}">${rv===null?'·':rv===0?'E':rv>0?'+'+rv:''+rv}</span>`;
           }).join('');
-
-          const holeRows = playedHoles.length ? `
-            <div class="gh-table">
-              <span class="gh-label">Hole</span>
-              <span class="gh-label">Score</span>
-              <span class="gh-label">Total</span>
-              ${holeCols}
-            </div>` : '<div style="font-size:10px;opacity:.5;padding:6px 0">No data yet</div>';
-
-          const gThru    = played.length;
-          const teetime  = getTeetime(g, roundKey);
-          const thruLabel = gThru === 18 ? 'F' : gThru > 0 ? 'Thru ' + gThru : teetime ? teetime + ' EDT' : 'NS';
-
           return `
-          <div class="golfer-card ${isBest?'best':''}" onclick="toggleGolfer('${cardId}')">
+          <div class="golfer-card ${isBest?'best':''}" onclick="event.stopPropagation(); toggleGolfer('${cardId}')">
             <div class="gc-tier">Tier ${gi+1}</div>
             <div class="gc-name">${g||'—'} <span class="gc-expand-icon" id="icon-${cardId}">▸</span></div>
-            <div class="gc-score ${totalCls(gScore)}">${fmtScore(gScore)} <span class="gc-thru">${thruLabel}</span></div>
+            <div class="gc-score ${totalCls(gScore)}">${fmtScore(gScore)} <span class="gc-thru">${thruLbl}</span></div>
             ${isBest?'<div class="gc-badge">★ Best ball</div>':''}
             <div class="gc-holes" id="${cardId}" style="display:none">
-              <div class="gh-header">
-                <span class="gh-hole">HOLE</span>
-                <span class="gh-per">SCORE</span>
-                <span class="gh-run">TOTAL</span>
+              <div class="gh-table">
+                <span class="gh-label">Hole</span><span class="gh-label">Score</span><span class="gh-label">Total</span>
+                ${holeCols||'<span style="font-size:10px;opacity:.5;grid-column:span 3">No data yet</span>'}
               </div>
-              ${holeRows || '<div style="font-size:10px;opacity:.5;padding:6px 0">No data yet</div>'}
             </div>
           </div>`;
         }).join('')}
@@ -773,35 +430,48 @@ function renderRound(roundKey, search) {
   });
 
   html += '</div>';
-  if (!rows.length) html = '<div class="state-msg">No teams found.</div>';
-  document.getElementById('appContent').innerHTML = html;
+  return rows.length ? html : '<div class="state-msg">No teams found.</div>';
 }
 
-function renderOverall(search) {
-  let rows = buildOverall();
+function buildOverallBoard() {
+  const search = (document.getElementById('searchInput')?.value||'').toLowerCase();
+
+  // Build map of weekend picks
+  const ssMap = {};
+  state.picksData.forEach(p => { if (p.r2golfers) ssMap[p.name] = p.r2golfers; });
+
+  let rows = state.picksData.map(pick => {
+    const tfG = pick.r1golfers || [];
+    const ssG = pick.r2golfers || tfG;
+    const r1bb=bestBall(tfG,'r1'), r2bb=bestBall(tfG,'r2');
+    const r3bb=bestBall(ssG,'r3'), r4bb=bestBall(ssG,'r4');
+    const r1=finalScore(r1bb), r2=finalScore(r2bb), r3=finalScore(r3bb), r4=finalScore(r4bb);
+    const total = [r1,r2,r3,r4].some(v=>v!==null) ? [r1,r2,r3,r4].reduce((s,v)=>s+(v??0),0) : null;
+    const holesPlayed = ['r1','r2'].reduce((s,rk)=>s+tfG.reduce((ss,g)=>ss+holeScoreVsPar(g,rk).filter(v=>v!==null).length,0),0)
+                      + ['r3','r4'].reduce((s,rk)=>s+ssG.reduce((ss,g)=>ss+holeScoreVsPar(g,rk).filter(v=>v!==null).length,0),0);
+    const pct = holesPlayed>0 ? Math.round((holesPlayed/288)*100) : 0;
+    return { pick, r1, r2, r3, r4, total, pct };
+  });
 
   rows.sort((a,b) => {
-    if (a.total===null && b.total===null) return 0;
-    if (a.total===null) return 1;
-    if (b.total===null) return -1;
-    return a.total - b.total;
+    if (a.total===null&&b.total===null) return 0;
+    if (a.total===null) return 1; if (b.total===null) return -1;
+    return a.total-b.total;
   });
 
-  let rank = 1;
+  let rank=1;
   rows.forEach((r,i) => {
-    if (i>0 && r.total !== rows[i-1].total) rank = i+1;
-    r.rankNum  = rank;
-    r.rankLabel = r.total===null ? '—' : rank===1?'1st':rank===2?'2nd':rank===3?'3rd':'T'+rank;
+    if (i>0&&r.total!==rows[i-1].total) rank=i+1;
+    r.rankNum=rank;
+    r.rankLabel=r.total===null?'—':rank===1?'1st':rank===2?'2nd':rank===3?'3rd':'T'+rank;
   });
 
-  if (search) rows = rows.filter(r => r.name.toLowerCase().includes(search));
+  if (search) rows = rows.filter(r => r.pick.name.toLowerCase().includes(search));
 
-  let html = `
-  <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,0.6);margin-bottom:12px;">Overall Standings</div>
+  let html = `<div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,0.6);margin-bottom:12px;">Overall Standings</div>
   <div class="leaderboard">
     <div class="lb-header overall-header">
-      <div class="lb-cell">POS</div>
-      <div class="lb-cell" style="justify-content:center">%</div>
+      <div class="lb-cell">POS</div><div class="lb-cell" style="justify-content:center">%</div>
       <div class="lb-cell" style="padding-left:6px">TEAM</div>
       <div class="lb-cell" style="justify-content:center">R1</div>
       <div class="lb-cell" style="justify-content:center">R2</div>
@@ -811,12 +481,12 @@ function renderOverall(search) {
     </div>`;
 
   rows.forEach(r => {
-    const isTop3 = r.rankNum<=3 && r.total!==null;
+    const isTop3 = r.rankNum<=3&&r.total!==null;
     html += `
     <div class="lb-row overall-row ${isTop3?'top-3':''}">
       <div class="lb-cell rank ${r.rankNum<=3&&r.total!==null?'gold':''}">${r.rankLabel}</div>
       <div class="lb-cell pct">${r.pct>0?r.pct+'%':'—'}</div>
-      <div class="lb-cell name">${r.name}</div>
+      <div class="lb-cell name">${r.pick.name}</div>
       <div class="lb-cell round-col ${totalCls(r.r1)}">${fmtScore(r.r1)}</div>
       <div class="lb-cell round-col ${totalCls(r.r2)}">${fmtScore(r.r2)}</div>
       <div class="lb-cell round-col ${totalCls(r.r3)}">${fmtScore(r.r3)}</div>
@@ -826,98 +496,638 @@ function renderOverall(search) {
   });
 
   html += '</div>';
-  if (!rows.length) html = '<div class="state-msg">No teams found.</div>';
-  document.getElementById('appContent').innerHTML = html;
+  return rows.length ? html : '<div class="state-msg">No picks submitted yet.</div>';
 }
 
-// Get tee time for a golfer in a given round
-function getTeetime(golferName, roundKey) {
-  const key = findGolfer(golferName);
-  if (!key) return '';
-  return mastersData[key]?.teetimes?.[roundKey] || '';
+// PICKS
+async function loadPicks() {
+  await anonLogin();
+  showLoading('appRoot');
+  const t = state.activeTournament;
+
+  // Find existing pick by this user (stored by userId)
+  let existingPick = null;
+  if (state.user) {
+    const picks = await getPicks(t.id);
+    existingPick = picks.find(p => p.userId === state.user.uid) || null;
+  }
+
+  state.mastersData = await fetchScores(t);
+  renderPicks(t, existingPick);
 }
 
-// Returns the best (lowest) per-hole vs-par score for a team on a single hole
-function bestBallPerHole(golfers, roundKey, holeIdx) {
-  const vals = golfers.map(g => {
-    const ph = holeScoreVsPar(g, roundKey);
-    return ph[holeIdx];
-  }).filter(v => v !== null);
-  return vals.length ? Math.min(...vals) : null;
+function renderPicks(t, existingPick) {
+  const isWeekend = t.picksPhase === 'weekend';
+  const tiers     = t.tiers || [];
+  const phase     = isWeekend ? 'r2golfers' : 'r1golfers';
+  const existing  = existingPick?.[phase] || [];
+  const locked    = t.locked || false;
+
+  if (locked) {
+    document.getElementById('appRoot').innerHTML = `
+      <div class="view-picks">
+        <div class="view-header">
+          <button class="back-btn" onclick="navigate('home')">← Back</button>
+          <div class="view-title">Submit Picks</div>
+        </div>
+        <div class="state-msg">🔒 Picks are locked for this round.</div>
+      </div>`;
+    return;
+  }
+
+  document.getElementById('appRoot').innerHTML = `
+    <div class="view-picks">
+      <div class="view-header">
+        <button class="back-btn" onclick="navigate('home')">← Back</button>
+        <div class="view-title">Submit Picks</div>
+        <div class="view-sub">${t.name} — ${isWeekend?'Sat & Sun':'Thu & Fri'}</div>
+      </div>
+
+      <div class="picks-form">
+        <div class="picks-intro">Select one golfer from each tier. Picks can be changed until the round starts.</div>
+
+        <div class="field-group">
+          <label class="field-label">Your Name</label>
+          <input type="text" id="picksName" class="field-input" placeholder="Full name" value="${existingPick?.name||''}">
+        </div>
+
+        ${tiers.map((tier, ti) => `
+          <div class="field-group">
+            <label class="field-label">Tier ${ti+1}</label>
+            <div class="tier-grid">
+              ${(tier.golfers||[]).map(g => {
+                const sel = existing[ti] === g;
+                const score = getGolferCurrentScore(g);
+                return `<div class="golfer-option ${sel?'selected':''}" onclick="selectGolfer(${ti}, '${g.replace(/'/g,"\\'")}', this)">
+                  <div class="go-name">${g}</div>
+                  <div class="go-score ${totalCls(score)}">${fmtScore(score)}</div>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>`).join('')}
+
+        <button class="btn-gold btn-full" onclick="submitPicks('${t.id}', '${phase}', ${JSON.stringify(tiers.map((_,i)=>i)).replace(/"/g,'')})">
+          ${existingPick ? 'Update Picks' : 'Submit Picks'}
+        </button>
+      </div>
+    </div>`;
+
+  // Store selections in memory
+  window._pickSelections = existing.slice();
 }
 
-// ── GOLFER EXPAND ────────────────────────────────────────────────────────────
+function selectGolfer(tierIdx, golferName, el) {
+  // Deselect others in same tier
+  const tierGrids = document.querySelectorAll('.tier-grid');
+  tierGrids[tierIdx]?.querySelectorAll('.golfer-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  if (!window._pickSelections) window._pickSelections = [];
+  window._pickSelections[tierIdx] = golferName;
+}
+
+function getGolferCurrentScore(golferName) {
+  const t = state.activeTournament;
+  if (!t) return null;
+  const r = detectCurrentRound();
+  if (!r) return null;
+  const rk  = 'r'+r;
+  const run = runningToPar(golferName, rk);
+  const played = run.filter(v=>v!==null);
+  return played.length ? played[played.length-1] : null;
+}
+
+async function submitPicks(tournamentId, phase, tierIndices) {
+  const name = document.getElementById('picksName')?.value?.trim();
+  if (!name) { alert('Please enter your name.'); return; }
+
+  const selections = window._pickSelections || [];
+  const t = state.activeTournament;
+  const tiers = t.tiers || [];
+
+  if (selections.filter(Boolean).length < tiers.length) {
+    alert('Please select one golfer from each tier.');
+    return;
+  }
+
+  const picks = await getPicks(tournamentId);
+  const existing = picks.find(p => p.userId === state.user?.uid);
+
+  const data = {
+    name,
+    userId: state.user?.uid || 'anon',
+    updatedAt: serverTimestamp(),
+    [phase]: selections,
+  };
+
+  if (!existing) data.r1golfers = selections; // default
+
+  try {
+    await savePick(tournamentId, existing?.id || null, data);
+    alert('Picks saved! ✓');
+    navigate('leaderboard', { tournament: t });
+  } catch(e) {
+    alert('Error saving picks: ' + e.message);
+  }
+}
+
+// ADMIN
+async function loadAdmin() {
+  if (!state.isAdmin) { navigate('home'); return; }
+  showLoading('appRoot');
+  state.tournaments = await getTournaments();
+  renderAdmin();
+}
+
+function renderAdmin() {
+  const t = state.tournaments;
+  document.getElementById('appRoot').innerHTML = `
+    <div class="view-admin">
+      <div class="view-header">
+        <button class="back-btn" onclick="navigate('home')">← Back</button>
+        <div class="view-title">Admin Panel</div>
+        <button class="btn-text" onclick="doSignOut()">Sign out</button>
+      </div>
+
+      <div class="admin-section">
+        <div class="section-label">Tournaments</div>
+        <button class="btn-gold" onclick="showNewTournamentForm()">+ New Tournament</button>
+        <div id="newTournamentForm" style="display:none" class="admin-form">
+          <input type="text"   id="tName"     class="field-input" placeholder="Tournament name (e.g. 2027 Masters)">
+          <input type="text"   id="tDates"    class="field-input" placeholder="Dates (e.g. Apr 10-13, 2027)">
+          <input type="text"   id="tFeed"     class="field-input" placeholder="Score feed URL">
+          <input type="date"   id="tStart"    class="field-input">
+          <select id="tStatus" class="field-input">
+            <option value="active">Active</option>
+            <option value="archived">Archived</option>
+          </select>
+          <button class="btn-gold" onclick="createTournament()">Create Tournament</button>
+        </div>
+      </div>
+
+      ${t.map(tournament => `
+        <div class="admin-tournament-card">
+          <div class="atc-header">
+            <div>
+              <div class="atc-name">${tournament.name}</div>
+              <div class="atc-status ${tournament.status}">${tournament.status}</div>
+            </div>
+            <div class="atc-actions">
+              <button class="btn-sm" onclick="editTournament('${tournament.id}')">Edit</button>
+              <button class="btn-sm" onclick="manageTiers('${tournament.id}')">Tiers</button>
+              <button class="btn-sm ${tournament.locked?'btn-sm-red':''}" onclick="toggleLock('${tournament.id}', ${tournament.locked||false})">
+                ${tournament.locked?'🔒 Unlock':'🔓 Lock Picks'}
+              </button>
+              <button class="btn-sm" onclick="archiveTournament('${tournament.id}')">Archive</button>
+              <button class="btn-sm" onclick="navigate('leaderboard', {tournament: ${JSON.stringify(tournament).replace(/"/g,'&quot;')}})">View →</button>
+            </div>
+          </div>
+          <div id="tiers-${tournament.id}" style="display:none"></div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function showNewTournamentForm() {
+  const f = document.getElementById('newTournamentForm');
+  f.style.display = f.style.display==='none' ? 'block' : 'none';
+}
+
+async function createTournament() {
+  const name  = document.getElementById('tName').value.trim();
+  const dates = document.getElementById('tDates').value.trim();
+  const feed  = document.getElementById('tFeed').value.trim();
+  const start = document.getElementById('tStart').value;
+  const status= document.getElementById('tStatus').value;
+  if (!name) { alert('Name required'); return; }
+  await addDoc(collection(db, 'tournaments'), {
+    name, dates, scoreFeed: feed, startDate: start, status,
+    locked: false, picksPhase: 'weekday', tiers: [], createdAt: serverTimestamp()
+  });
+  await loadAdmin();
+}
+
+async function toggleLock(id, current) {
+  await updateDoc(doc(db, 'tournaments', id), { locked: !current });
+  await loadAdmin();
+}
+
+async function archiveTournament(id) {
+  if (!confirm('Archive this tournament?')) return;
+  await updateDoc(doc(db, 'tournaments', id), { status: 'archived' });
+  await loadAdmin();
+}
+
+async function manageTiers(tournamentId) {
+  const el = document.getElementById('tiers-'+tournamentId);
+  if (el.style.display !== 'none') { el.style.display='none'; return; }
+
+  const t = await getTournament(tournamentId);
+  const tiers = t.tiers || [{golfers:[]},{golfers:[]},{golfers:[]},{golfers:[]}];
+
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="tiers-editor">
+      <div class="section-label" style="margin-top:16px">Manage Tiers</div>
+      <div class="tiers-phase">
+        <label class="field-label">Picks Phase</label>
+        <select id="phase-${tournamentId}" class="field-input" style="width:auto">
+          <option value="weekday" ${t.picksPhase==='weekday'?'selected':''}>Thu & Fri (Weekday)</option>
+          <option value="weekend" ${t.picksPhase==='weekend'?'selected':''}>Sat & Sun (Weekend)</option>
+        </select>
+        <button class="btn-sm" onclick="savePhase('${tournamentId}')">Save</button>
+      </div>
+      ${tiers.map((tier, ti) => `
+        <div class="tier-editor">
+          <div class="te-label">Tier ${ti+1}</div>
+          <textarea id="tier-${tournamentId}-${ti}" class="field-input tier-textarea" placeholder="One golfer per line">${(tier.golfers||[]).join('\n')}</textarea>
+        </div>`).join('')}
+      <button class="btn-gold" onclick="saveTiers('${tournamentId}')">Save Tiers</button>
+    </div>`;
+}
+
+async function savePhase(tournamentId) {
+  const phase = document.getElementById('phase-'+tournamentId).value;
+  await updateDoc(doc(db, 'tournaments', tournamentId), { picksPhase: phase==='weekend'?'weekend':'weekday' });
+  alert('Phase saved!');
+}
+
+async function saveTiers(tournamentId) {
+  const tiers = [0,1,2,3].map(i => {
+    const val = document.getElementById(`tier-${tournamentId}-${i}`)?.value || '';
+    return { golfers: val.split('\n').map(g=>g.trim()).filter(Boolean) };
+  });
+  await updateDoc(doc(db, 'tournaments', tournamentId), { tiers });
+  alert('Tiers saved!');
+}
+
+async function editTournament(id) {
+  const t = await getTournament(id);
+  const name   = prompt('Tournament name:', t.name);
+  if (name===null) return;
+  const dates  = prompt('Dates:', t.dates||'');
+  const feed   = prompt('Score feed URL:', t.scoreFeed||'');
+  await updateDoc(doc(db, 'tournaments', id), { name, dates, scoreFeed: feed });
+  await loadAdmin();
+}
+
+// ADMIN LOGIN
+function showAdminLogin() {
+  document.getElementById('appRoot').innerHTML = `
+    <div class="view-login">
+      <div class="login-card">
+        <div class="header-badge">Admin</div>
+        <h2 style="font-family:'Playfair Display',serif; font-size:28px; margin:12px 0">Sign In</h2>
+        <input type="email"    id="adminEmail" class="field-input" placeholder="Email">
+        <input type="password" id="adminPass"  class="field-input" placeholder="Password" style="margin-top:8px">
+        <button class="btn-gold btn-full" style="margin-top:16px" onclick="doAdminLogin()">Sign In</button>
+        <button class="btn-text" style="margin-top:12px" onclick="navigate('home')">Cancel</button>
+      </div>
+    </div>`;
+}
+
+async function doAdminLogin() {
+  const email = document.getElementById('adminEmail').value;
+  const pass  = document.getElementById('adminPass').value;
+  await adminLogin(email, pass);
+  if (state.isAdmin) navigate('admin');
+}
+
+async function doSignOut() {
+  await signOut(auth);
+  navigate('home');
+}
+
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+function setTab(tab) {
+  state.currentTab  = tab;
+  state.expandedRow = null;
+  renderLeaderboard();
+}
+
+function toggleExpand(idx) {
+  state.expandedRow = state.expandedRow===idx ? null : idx;
+  renderLeaderboard();
+}
+
 function toggleGolfer(cardId) {
-  event.stopPropagation(); // don't collapse the team row
   const el   = document.getElementById(cardId);
-  const icon = document.getElementById('icon-' + cardId);
+  const icon = document.getElementById('icon-'+cardId);
   if (!el) return;
-  const isOpen = el.style.display !== 'none';
-  el.style.display   = isOpen ? 'none' : 'block';
+  const isOpen = el.style.display!=='none';
+  el.style.display = isOpen?'none':'block';
   if (icon) icon.classList.toggle('open', !isOpen);
 }
 
-// Detect which round is currently in progress based on Masters feed data
-function detectCurrentRound() {
-  for (let r = 4; r >= 1; r--) {
-    const key = 'r' + r;
-    // Check if any player has scores in this round
-    const hasData = Object.values(mastersData).some(p =>
-      (p[key] || []).some(s => s !== null && s !== undefined)
-    );
-    if (hasData) return r;
-  }
-  return null;
+function showLoading(id) {
+  document.getElementById(id).innerHTML = '<div class="state-msg"><div class="spinner"></div>Loading…</div>';
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
-async function init() {
-  try {
-    const [tfTable, ssTable, masters] = await Promise.all([
-      fetchSheetJSON(TF_GID),
-      fetchSheetJSON(SS_GID),
-      fetchMasters(),
-    ]);
+window.navigate      = navigate;
+window.setTab        = setTab;
+window.toggleExpand  = toggleExpand;
+window.toggleGolfer  = toggleGolfer;
+window.selectGolfer  = selectGolfer;
+window.submitPicks   = submitPicks;
+window.showAdminLogin= showAdminLogin;
+window.doAdminLogin  = doAdminLogin;
+window.doSignOut     = doSignOut;
+window.showNewTournamentForm = showNewTournamentForm;
+window.createTournament      = createTournament;
+window.toggleLock            = toggleLock;
+window.archiveTournament     = archiveTournament;
+window.manageTiers           = manageTiers;
+window.saveTiers             = saveTiers;
+window.savePhase             = savePhase;
+window.editTournament        = editTournament;
 
-    tfPicks     = parsePicks(tfTable);
-    ssPicks     = parsePicks(ssTable);
-    mastersData = masters;
+navigate('home');
+</script>
 
-    document.getElementById('lastUpdated').textContent =
-      'Updated ' + new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-
-    // Auto-detect current round from Masters data, fall back to Overall
-    const currentRoundNum = detectCurrentRound();
-    if (currentRoundNum) {
-      currentTab = 'r' + currentRoundNum;
-      document.querySelectorAll('.round-tab').forEach(t => t.classList.remove('active'));
-      document.getElementById('tab-r' + currentRoundNum).classList.add('active');
-    } else {
-      currentTab = 'overall';
-      document.querySelectorAll('.round-tab').forEach(t => t.classList.remove('active'));
-      document.getElementById('tab-overall').classList.add('active');
-    }
-
-    renderLeaderboard();
-
-    // Auto-refresh every 5 minutes
-    setInterval(async () => {
-      mastersData = await fetchMasters();
-      document.getElementById('lastUpdated').textContent =
-        'Updated ' + new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-      renderLeaderboard();
-    }, 5 * 60 * 1000);
-
-  } catch(e) {
-    console.error(e);
-    document.getElementById('appContent').innerHTML =
-      `<div class="state-msg">⚠ Could not load data.<br><br>
-      Make sure your Google Sheet is set to <strong>Anyone with the link → Viewer</strong>.<br><br>
-      <small style="opacity:.5">${e.message}</small></div>`;
-  }
+<style>
+:root {
+  --green-deep: #1a3a2a;
+  --green-mid:  #2d5a3d;
+  --gold:       #c9a84c;
+  --gold-light: #e8c97a;
+  --cream:      #f5f0e8;
+  --red:        #c0392b;
 }
 
-init();
-</script>
+* { box-sizing:border-box; margin:0; padding:0; }
+
+body {
+  background: var(--green-deep);
+  color: var(--cream);
+  font-family: 'DM Mono', monospace;
+  min-height: 100vh;
+}
+
+body::before {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none'%3E%3Cg fill='%23ffffff' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+#appRoot { position:relative; z-index:1; max-width:1100px; margin:0 auto; padding:0 16px 60px; }
+
+/* HEADER */
+.app-header {
+  text-align:center; padding:32px 0 24px;
+  border-bottom:1px solid rgba(201,168,76,0.3); margin-bottom:24px;
+}
+.header-badge {
+  display:inline-block; background:var(--gold); color:var(--green-deep);
+  font-size:10px; font-weight:500; letter-spacing:3px; padding:4px 14px;
+  text-transform:uppercase; margin-bottom:12px;
+}
+h1 {
+  font-family:'Playfair Display',serif; font-size:clamp(28px,7vw,48px);
+  font-weight:900; color:var(--cream); line-height:1; letter-spacing:-1px;
+}
+h1 span { color:var(--gold); font-style:italic; }
+
+/* STATUS */
+.status-bar {
+  display:flex; justify-content:space-between; align-items:center;
+  background:rgba(255,255,255,0.04); border:1px solid rgba(201,168,76,0.2);
+  padding:10px 16px; margin-bottom:16px; font-size:11px; letter-spacing:1px;
+}
+.status-live { display:flex; align-items:center; gap:8px; color:var(--gold); text-transform:uppercase; }
+.pulse { width:8px;height:8px;background:var(--gold);border-radius:50%;animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.8)} }
+.last-updated { color:rgba(245,240,232,0.4); font-size:10px; }
+
+/* NAVIGATION */
+.back-btn {
+  background:none; border:none; color:rgba(245,240,232,0.5);
+  font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px;
+  cursor:pointer; padding:0; text-transform:uppercase;
+}
+.back-btn:hover { color:var(--cream); }
+
+.view-header { margin-bottom:20px; }
+.view-title { font-family:'Playfair Display',serif; font-size:24px; font-weight:700; margin-top:6px; }
+.view-sub { font-size:11px; color:rgba(245,240,232,0.4); letter-spacing:1px; margin-top:4px; }
+
+/* HOME */
+.section-label {
+  font-size:10px; letter-spacing:3px; text-transform:uppercase;
+  color:rgba(201,168,76,0.7); margin-bottom:12px;
+}
+.tournament-card {
+  background:rgba(255,255,255,0.04); border:1px solid rgba(201,168,76,0.3);
+  padding:20px; cursor:pointer; transition:all 0.2s; margin-bottom:12px;
+}
+.tournament-card:hover { background:rgba(255,255,255,0.07); }
+.active-card { border-color:rgba(201,168,76,0.5); }
+.tc-badge { font-size:9px; letter-spacing:2px; color:var(--gold); text-transform:uppercase; margin-bottom:8px; }
+.tc-name { font-family:'Playfair Display',serif; font-size:22px; font-weight:700; }
+.tc-dates { font-size:11px; color:rgba(245,240,232,0.4); margin-top:4px; margin-bottom:16px; }
+.tc-actions { display:flex; gap:10px; flex-wrap:wrap; }
+.archive-list { display:flex; flex-direction:column; gap:8px; }
+.archive-card {
+  display:flex; justify-content:space-between; align-items:center;
+  background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08);
+  padding:14px 16px; cursor:pointer; transition:all 0.2s;
+}
+.archive-card:hover { background:rgba(255,255,255,0.06); }
+.ac-name { font-family:'Playfair Display',serif; font-size:15px; font-weight:700; }
+.ac-dates { font-size:11px; color:rgba(245,240,232,0.4); margin-top:2px; }
+.ac-arrow { color:rgba(201,168,76,0.6); font-size:18px; }
+.no-tournament { text-align:center; padding:40px 20px; color:rgba(245,240,232,0.4); font-size:13px; line-height:1.8; }
+
+/* BUTTONS */
+.btn-gold {
+  background:var(--gold); color:var(--green-deep); border:none;
+  font-family:'DM Mono',monospace; font-size:11px; font-weight:500;
+  letter-spacing:2px; text-transform:uppercase; padding:10px 20px;
+  cursor:pointer; transition:all 0.2s;
+}
+.btn-gold:hover { background:var(--gold-light); }
+.btn-full { width:100%; padding:14px; font-size:13px; }
+.btn-outline {
+  background:none; border:1px solid rgba(201,168,76,0.4); color:var(--gold);
+  font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
+  text-transform:uppercase; padding:10px 20px; cursor:pointer; transition:all 0.2s;
+}
+.btn-outline:hover { border-color:var(--gold); background:rgba(201,168,76,0.1); }
+.btn-text {
+  background:none; border:none; color:rgba(245,240,232,0.4);
+  font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px;
+  cursor:pointer; text-decoration:underline; text-underline-offset:3px;
+}
+.btn-text:hover { color:var(--cream); }
+.btn-sm {
+  background:rgba(255,255,255,0.08); border:none; color:var(--cream);
+  font-family:'DM Mono',monospace; font-size:10px; letter-spacing:1px;
+  padding:6px 12px; cursor:pointer; transition:all 0.2s;
+}
+.btn-sm:hover { background:rgba(255,255,255,0.15); }
+.btn-sm-red { background:rgba(192,57,43,0.3); }
+
+/* ROUND TABS */
+.round-tabs {
+  display:flex; gap:2px; margin-bottom:16px;
+  border-bottom:1px solid rgba(201,168,76,0.2);
+  overflow-x:auto; -webkit-overflow-scrolling:touch;
+  scrollbar-width:none; -ms-overflow-style:none;
+}
+.round-tabs::-webkit-scrollbar { display:none; }
+.round-tab {
+  background:none; border:none; color:rgba(245,240,232,0.4);
+  font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
+  text-transform:uppercase; padding:10px 18px; cursor:pointer;
+  border-bottom:2px solid transparent; margin-bottom:-1px;
+  transition:all 0.2s; white-space:nowrap;
+}
+.round-tab:hover { color:var(--cream); }
+.round-tab.active { color:var(--gold); border-bottom-color:var(--gold); }
+.round-tab.overall { color:rgba(201,168,76,0.6); }
+.round-tab.overall.active { color:var(--gold-light); border-bottom-color:var(--gold-light); }
+
+/* SEARCH */
+.search-wrap { position:relative; margin-bottom:16px; }
+.search-wrap input {
+  width:100%; background:rgba(255,255,255,0.05); border:1px solid rgba(201,168,76,0.2);
+  color:var(--cream); font-family:'DM Mono',monospace; font-size:13px;
+  padding:12px 16px 12px 40px; outline:none; transition:border-color 0.2s;
+}
+.search-wrap input::placeholder { color:rgba(245,240,232,0.3); }
+.search-wrap input:focus { border-color:var(--gold); }
+.search-icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:rgba(245,240,232,0.3); font-size:14px; }
+
+/* TABLE */
+.table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.leaderboard  { display:flex; flex-direction:column; gap:2px; min-width:900px; }
+
+.lb-header {
+  display:grid;
+  grid-template-columns: 52px 56px 180px 58px 52px repeat(18, 1fr);
+  padding:8px 12px; font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
+  color:rgba(201,168,76,0.7); border-bottom:1px solid rgba(201,168,76,0.2);
+}
+.lb-header.overall-header {
+  grid-template-columns: 52px 56px 180px 80px 80px 80px 80px 100px;
+}
+.lb-row {
+  display:grid;
+  grid-template-columns: 52px 56px 180px 58px 52px repeat(18, 1fr);
+  padding:0 12px; background:rgba(255,255,255,0.03);
+  border:1px solid transparent; cursor:pointer; transition:all 0.15s;
+}
+.lb-row.overall-row {
+  grid-template-columns: 52px 56px 180px 80px 80px 80px 80px 100px;
+  cursor:default;
+}
+.lb-row:hover { background:rgba(255,255,255,0.06); border-color:rgba(201,168,76,0.15); }
+.lb-row.expanded { background:rgba(255,255,255,0.06); border-color:rgba(201,168,76,0.3); }
+.lb-row.top-3 { background:rgba(201,168,76,0.07); }
+.lb-row.top-3:hover { background:rgba(201,168,76,0.12); }
+
+.lb-cell { display:flex; align-items:center; padding:13px 2px; font-size:11px; white-space:nowrap; overflow:hidden; }
+.lb-cell.rank { font-size:11px; color:rgba(245,240,232,0.5); }
+.lb-cell.rank.gold { color:var(--gold); }
+.lb-cell.name { font-family:'Playfair Display',serif; font-size:13px; font-weight:700; color:var(--cream); padding-left:6px; overflow:hidden; text-overflow:ellipsis; }
+.lb-cell.hole-score { font-size:10px; justify-content:center; color:rgba(245,240,232,0.55); }
+.lb-cell.hole-score.birdie { color:#5dade2; }
+.lb-cell.hole-score.eagle  { color:var(--gold); font-weight:500; }
+.lb-cell.hole-score.bogey  { color:#e67e73; }
+.lb-cell.hole-score.double { color:var(--red); }
+.lb-cell.hole-score.empty  { color:rgba(245,240,232,0.15); }
+.lb-cell.total { font-size:13px; font-weight:500; justify-content:center; color:var(--cream); }
+.lb-cell.total.under { color:#5dade2; } .lb-cell.total.over { color:#e67e73; }
+.lb-cell.thru  { font-size:10px; color:rgba(245,240,232,0.4); justify-content:center; }
+.lb-cell.pct   { font-size:10px; color:rgba(201,168,76,0.7); justify-content:center; }
+.lb-cell.round-col { font-size:12px; font-weight:500; justify-content:center; }
+.lb-cell.round-col.under { color:#5dade2; } .lb-cell.round-col.over { color:#e67e73; }
+.lb-cell.overall-total { font-size:15px; font-weight:700; justify-content:center; font-family:'Playfair Display',serif; }
+.lb-cell.overall-total.under { color:#5dade2; } .lb-cell.overall-total.over { color:#e67e73; }
+
+.lb-detail {
+  display:none; background:rgba(0,0,0,0.2);
+  border-top:1px solid rgba(201,168,76,0.15); padding:14px 12px; min-width:960px;
+}
+.lb-row.expanded + .lb-detail { display:block; }
+
+/* GOLFER CARDS */
+.golfer-cards { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+@media(max-width:600px) { .golfer-cards { grid-template-columns:repeat(2,1fr); } }
+.golfer-card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); padding:12px; cursor:pointer; }
+.golfer-card.best { border-color:rgba(201,168,76,0.4); background:rgba(201,168,76,0.07); }
+.gc-tier  { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:rgba(245,240,232,0.4); margin-bottom:4px; }
+.gc-name  { font-family:'Playfair Display',serif; font-size:13px; font-weight:700; color:var(--cream); margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gc-score { font-size:18px; font-weight:500; }
+.gc-score.under { color:#5dade2; } .gc-score.over { color:#e67e73; }
+.gc-badge { font-size:9px; letter-spacing:1px; color:var(--gold); text-transform:uppercase; margin-top:4px; }
+.gc-thru  { font-size:11px; color:rgba(245,240,232,0.4); margin-left:6px; font-weight:300; }
+.gc-expand-icon { font-size:9px; color:rgba(245,240,232,0.35); margin-left:4px; transition:transform 0.2s; display:inline-block; }
+.gc-expand-icon.open { transform:rotate(90deg); }
+.gc-holes { margin-top:10px; border-top:1px solid rgba(255,255,255,0.08); padding-top:10px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.gh-table { display:grid; grid-template-rows:repeat(3,auto); grid-auto-flow:column; gap:0; min-width:max-content; }
+.gh-label { font-size:8px; letter-spacing:1.5px; text-transform:uppercase; color:rgba(201,168,76,0.6); padding:0 8px 4px 0; white-space:nowrap; }
+.gh-hole  { color:rgba(245,240,232,0.4); font-size:10px; padding:3px 8px 3px 0; text-align:center; }
+.gh-per   { font-size:11px; padding:3px 8px 3px 0; text-align:center; }
+.gh-run   { font-size:10px; padding:3px 8px 3px 0; text-align:center; color:rgba(245,240,232,0.5); }
+.eagle { color:var(--gold); } .birdie { color:#5dade2; } .bogey { color:#e67e73; } .double { color:var(--red); }
+.under { color:#5dade2; } .over { color:#e67e73; }
+
+/* PICKS FORM */
+.view-picks { max-width:600px; }
+.picks-form { margin-top:16px; }
+.picks-intro { font-size:12px; color:rgba(245,240,232,0.5); margin-bottom:20px; line-height:1.6; }
+.field-group { margin-bottom:20px; }
+.field-label { display:block; font-size:10px; letter-spacing:2px; text-transform:uppercase; color:rgba(201,168,76,0.7); margin-bottom:8px; }
+.field-input {
+  width:100%; background:rgba(255,255,255,0.05); border:1px solid rgba(201,168,76,0.2);
+  color:var(--cream); font-family:'DM Mono',monospace; font-size:13px; padding:12px;
+  outline:none; transition:border-color 0.2s;
+}
+.field-input:focus { border-color:var(--gold); }
+.tier-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:8px; }
+.golfer-option {
+  background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
+  padding:10px 12px; cursor:pointer; transition:all 0.15s;
+}
+.golfer-option:hover { background:rgba(255,255,255,0.08); }
+.golfer-option.selected { background:rgba(201,168,76,0.15); border-color:rgba(201,168,76,0.5); }
+.go-name  { font-size:12px; color:var(--cream); margin-bottom:3px; }
+.go-score { font-size:11px; }
+
+/* ADMIN */
+.view-admin { max-width:800px; }
+.admin-section { margin-bottom:24px; }
+.admin-form { margin-top:16px; display:flex; flex-direction:column; gap:8px; }
+.admin-tournament-card {
+  background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08);
+  padding:16px; margin-bottom:8px;
+}
+.atc-header { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; }
+.atc-name   { font-family:'Playfair Display',serif; font-size:16px; font-weight:700; }
+.atc-status { font-size:9px; letter-spacing:2px; text-transform:uppercase; margin-top:4px; color:rgba(245,240,232,0.4); }
+.atc-status.active { color:var(--gold); }
+.atc-actions { display:flex; gap:6px; flex-wrap:wrap; }
+.tiers-editor { padding:12px 0; }
+.tiers-phase  { display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+.tier-editor  { margin-bottom:12px; }
+.te-label     { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:rgba(201,168,76,0.7); margin-bottom:6px; }
+.tier-textarea { height:120px; resize:vertical; }
+
+/* LOGIN */
+.view-login { display:flex; justify-content:center; align-items:center; min-height:60vh; }
+.login-card  { background:rgba(255,255,255,0.04); border:1px solid rgba(201,168,76,0.3); padding:32px; width:100%; max-width:360px; text-align:center; }
+
+/* MISC */
+.state-msg { text-align:center; padding:60px 20px; color:rgba(245,240,232,0.5); font-size:13px; letter-spacing:1px; }
+.spinner   { width:32px;height:32px;border:2px solid rgba(201,168,76,0.2);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+</style>
+
+<div id="appHeader" style="position:relative;z-index:1;text-align:center;padding:32px 16px 20px;border-bottom:1px solid rgba(201,168,76,0.3);margin-bottom:24px;max-width:1100px;margin-left:auto;margin-right:auto;">
+  <div class="header-badge">⛳ Best Ball Golf</div>
+  <h1>Best Ball <span>Golf</span></h1>
+</div>
+
+<div id="appRoot" style="position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:0 16px 60px;">
+  <div class="state-msg"><div class="spinner"></div>Loading…</div>
+</div>
 </body>
 </html>
