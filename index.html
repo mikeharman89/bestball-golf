@@ -31,7 +31,7 @@ const auth = getAuth(app);
 const db   = getFirestore(app);
 
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
-const ADMIN_EMAIL = 'mike.harman18@gmail.com'; // e.g. 'you@gmail.com'
+const ADMIN_EMAIL = 'mike.harman18@gmail.com';
 const PARS = [4,5,4,3,4,3,4,5,4,4,4,3,5,4,5,3,4,4];
 
 // ── STATE ────────────────────────────────────────────────────────────────────
@@ -775,9 +775,28 @@ async function managePicks(tournamentId) {
   el.style.display = 'block';
   el.innerHTML = '<div class="state-msg"><div class="spinner"></div>Loading picks…</div>';
 
-  const picks = await getPicks(tournamentId);
+  let picks, tournament;
+  try {
+    [picks, tournament] = await Promise.all([
+      getPicks(tournamentId),
+      getTournament(tournamentId)
+    ]);
+  } catch(e) {
+    el.innerHTML = `<div style="padding:16px;font-size:12px;color:#e67e73">Error loading picks: ${e.message}</div>`;
+    return;
+  }
+
+  const tiers = tournament?.tiers || [];
+
   if (!picks.length) {
-    el.innerHTML = '<div style="padding:16px;font-size:12px;color:rgba(245,240,232,0.4)">No picks submitted yet.</div>';
+    el.innerHTML = `<div style="padding:16px;font-size:12px;color:rgba(245,240,232,0.4)">No picks submitted yet.
+      <div style="margin-top:12px">
+        <button class="btn-gold" onclick="toggleNewPickForm('new-pick-${tournamentId}')">+ Add Entry</button>
+        <div id="new-pick-${tournamentId}" style="display:none;margin-top:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(201,168,76,0.2);padding:16px">
+          ${buildNewPickForm(tournamentId, tiers)}
+        </div>
+      </div>
+    </div>`;
     return;
   }
 
@@ -848,41 +867,52 @@ async function managePicks(tournamentId) {
         </tbody>
       </table>
       <div style="margin-top:12px">
-        <button class="btn-gold" onclick="toggleNewPickForm('new-pick-' + tournamentId)">+ Add Entry</button>
+        <button class="btn-gold" onclick="toggleNewPickForm('new-pick-${tournamentId}')">+ Add Entry</button>
         <div id="new-pick-${tournamentId}" style="display:none;margin-top:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(201,168,76,0.2);padding:16px">
-          <div class="section-label" style="margin-bottom:12px">New Entry</div>
-          <div class="field-group">
-            <label class="field-label">Name</label>
-            <input type="text" class="pick-edit-input" id="new-name-${tournamentId}" placeholder="Team name">
-          </div>
-          <div class="field-group">
-            <label class="field-label">Thu &amp; Fri Picks</label>
-            ${tiers.map((tier, i) => `
-              <div class="pick-golfer-row" style="margin-bottom:6px">
-                <span class="pick-tier">T${i+1}</span>
-                <select class="pick-edit-input pick-golfer-input" id="new-r1-${tournamentId}-${i}">
-                  <option value="">-- Select golfer --</option>
-                  ${(tier.golfers||[]).map(g => `<option value="${g}">${g}</option>`).join('')}
-                </select>
-              </div>`).join('')}
-          </div>
-          <div class="field-group">
-            <label class="field-label">Sat &amp; Sun Picks <span style="opacity:.4;font-size:9px">(optional)</span></label>
-            ${tiers.map((tier, i) => `
-              <div class="pick-golfer-row" style="margin-bottom:6px">
-                <span class="pick-tier">T${i+1}</span>
-                <select class="pick-edit-input pick-golfer-input" id="new-r2-${tournamentId}-${i}">
-                  <option value="">-- Select golfer --</option>
-                  ${(tier.golfers||[]).map(g => `<option value="${g}">${g}</option>`).join('')}
-                </select>
-              </div>`).join('')}
-          </div>
-          <div style="display:flex;gap:8px;margin-top:4px">
-            <button class="btn-gold" onclick="addNewPick('${tournamentId}')">Save Entry</button>
-            <button class="btn-outline" onclick="toggleNewPickForm('new-pick-${tournamentId}')">Cancel</button>
-          </div>
+          ${buildNewPickForm(tournamentId, tiers)}
         </div>
       </div>
+    </div>`;
+}
+
+function buildNewPickForm(tournamentId, tiers) {
+  const makeOptions = (tier) =>
+    '<option value="">-- Select golfer --</option>' +
+    (tier.golfers||[]).map(g => `<option value="${g}">${g}</option>`).join('');
+
+  const r1rows = tiers.map((tier, i) => `
+    <div class="pick-golfer-row" style="margin-bottom:6px">
+      <span class="pick-tier">T${i+1}</span>
+      <select class="pick-edit-input pick-golfer-input" id="new-r1-${tournamentId}-${i}">
+        ${makeOptions(tier)}
+      </select>
+    </div>`).join('');
+
+  const r2rows = tiers.map((tier, i) => `
+    <div class="pick-golfer-row" style="margin-bottom:6px">
+      <span class="pick-tier">T${i+1}</span>
+      <select class="pick-edit-input pick-golfer-input" id="new-r2-${tournamentId}-${i}">
+        ${makeOptions(tier)}
+      </select>
+    </div>`).join('');
+
+  return `
+    <div class="section-label" style="margin-bottom:12px">New Entry</div>
+    <div class="field-group">
+      <label class="field-label">Name</label>
+      <input type="text" class="pick-edit-input" id="new-name-${tournamentId}" placeholder="Team name">
+    </div>
+    <div class="field-group">
+      <label class="field-label">Thu &amp; Fri Picks</label>
+      ${r1rows}
+    </div>
+    <div class="field-group">
+      <label class="field-label">Sat &amp; Sun Picks <span style="opacity:.4;font-size:9px">(optional)</span></label>
+      ${r2rows}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn-gold" onclick="addNewPick('${tournamentId}')">Save Entry</button>
+      <button class="btn-outline" onclick="toggleNewPickForm('new-pick-${tournamentId}')">Cancel</button>
     </div>`;
 }
 
