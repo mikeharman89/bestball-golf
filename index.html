@@ -847,7 +847,70 @@ async function managePicks(tournamentId) {
             </tr>`).join('')}
         </tbody>
       </table>
+      <div style="margin-top:12px">
+        <button class="btn-gold" onclick="toggleNewPickForm('new-pick-${tournamentId}')">+ Add Entry</button>
+        <div id="new-pick-${tournamentId}" style="display:none;margin-top:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(201,168,76,0.2);padding:16px">
+          <div class="section-label" style="margin-bottom:12px">New Entry</div>
+          <div class="field-group">
+            <label class="field-label">Name</label>
+            <input type="text" class="pick-edit-input" id="new-name-${tournamentId}" placeholder="Team name">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Thu &amp; Fri Picks</label>
+            ${[0,1,2,3].map(i => '<div class="pick-golfer-row" style="margin-bottom:6px"><span class="pick-tier">T'+(i+1)+'</span><input type="text" class="pick-edit-input pick-golfer-input" id="new-r1-${tournamentId}-'+i+'" placeholder="Golfer name"></div>').join('')}
+          </div>
+          <div class="field-group">
+            <label class="field-label">Sat &amp; Sun Picks <span style="opacity:.4;font-size:9px">(optional)</span></label>
+            ${[0,1,2,3].map(i => '<div class="pick-golfer-row" style="margin-bottom:6px"><span class="pick-tier">T'+(i+1)+'</span><input type="text" class="pick-edit-input pick-golfer-input" id="new-r2-${tournamentId}-'+i+'" placeholder="Golfer name"></div>').join('')}
+          </div>
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <button class="btn-gold" onclick="addNewPick('${tournamentId}')">Save Entry</button>
+            <button class="btn-outline" onclick="toggleNewPickForm('new-pick-${tournamentId}')">Cancel</button>
+          </div>
+        </div>
+      </div>
     </div>`;
+}
+
+function toggleNewPickForm(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function addNewPick(tournamentId) {
+  const name = document.getElementById('new-name-' + tournamentId)?.value?.trim();
+  if (!name) { alert('Please enter a name.'); return; }
+
+  const r1golfers = [0,1,2,3].map(i =>
+    document.getElementById(`new-r1-${tournamentId}-${i}`)?.value?.trim() || ''
+  ).filter(Boolean);
+
+  if (r1golfers.length < 4) { alert('Please enter all 4 Thu/Fri golfers.'); return; }
+
+  const r2inputs  = [0,1,2,3].map(i =>
+    document.getElementById(`new-r2-${tournamentId}-${i}`)?.value?.trim() || ''
+  );
+  const r2golfers = r2inputs.filter(Boolean);
+
+  const data = {
+    name,
+    r1golfers,
+    userId: 'admin',
+    paid: false,
+    updatedAt: serverTimestamp(),
+  };
+  if (r2golfers.length === 4) data.r2golfers = r2golfers;
+
+  try {
+    await addDoc(collection(db, 'tournaments', tournamentId, 'picks'), data);
+    alert('Entry added! ✓');
+    // Refresh the picks panel
+    document.getElementById('picks-' + tournamentId).style.display = 'none';
+    await managePicks(tournamentId);
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
 }
 
 function toggleUnpaidList(id) {
@@ -990,6 +1053,8 @@ window.editTournament        = editTournament;
 window.managePicks           = managePicks;
 window.togglePaid            = togglePaid;
 window.toggleUnpaidList      = toggleUnpaidList;
+window.toggleNewPickForm     = toggleNewPickForm;
+window.addNewPick            = addNewPick;
 window.savePickEdit          = savePickEdit;
 window.deletePick            = deletePick;
 window.submitPicksForPhase   = submitPicksForPhase;
