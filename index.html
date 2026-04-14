@@ -336,7 +336,10 @@ function buildRoundBoard(roundKey) {
   const search = (document.getElementById('searchInput')?.value||'').toLowerCase();
   const roundLabels = {r1:'Round 1 — Thursday',r2:'Round 2 — Friday',r3:'Round 3 — Saturday',r4:'Round 4 — Sunday'};
 
-  let rows = state.picksData.map(pick => {
+  const unpaidPicks = state.picksData.filter(p => !p.paid);
+  const paidPicks   = state.picksData.filter(p => p.paid);
+
+  let rows = paidPicks.map(pick => {
     const golfers = isWeekend ? (pick.r2golfers||pick.r1golfers||[]) : (pick.r1golfers||[]);
     const bb      = bestBall(golfers, roundKey);
     const total   = finalScore(bb);
@@ -432,7 +435,19 @@ function buildRoundBoard(roundKey) {
   });
 
   html += '</div>';
-  return rows.length ? html : '<div class="state-msg">No teams found.</div>';
+
+  // Unpaid section below leaderboard
+  if (unpaidPicks.length) {
+    html += `
+    <div class="unpaid-section">
+      <div class="unpaid-header">⏳ Awaiting Payment (${unpaidPicks.length})</div>
+      <div class="unpaid-list">
+        ${unpaidPicks.map(p => `<div class="unpaid-item">${p.name||'Unknown'}</div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  return html;
 }
 
 function buildOverallBoard() {
@@ -442,7 +457,9 @@ function buildOverallBoard() {
   const ssMap = {};
   state.picksData.forEach(p => { if (p.r2golfers) ssMap[p.name] = p.r2golfers; });
 
-  let rows = state.picksData.map(pick => {
+  const unpaidPicks = state.picksData.filter(p => !p.paid);
+
+  let rows = state.picksData.filter(p => p.paid).map(pick => {
     const tfG = pick.r1golfers || [];
     const ssG = pick.r2golfers || tfG;
     const r1bb=bestBall(tfG,'r1'), r2bb=bestBall(tfG,'r2');
@@ -498,6 +515,18 @@ function buildOverallBoard() {
   });
 
   html += '</div>';
+
+  // Unpaid section below leaderboard
+  if (unpaidPicks.length) {
+    html += `
+    <div class="unpaid-section">
+      <div class="unpaid-header">⏳ Awaiting Payment (${unpaidPicks.length})</div>
+      <div class="unpaid-list">
+        ${unpaidPicks.map(p => `<div class="unpaid-item">${p.name||'Unknown'}</div>`).join('')}
+      </div>
+    </div>`;
+  }
+
   return rows.length ? html : '<div class="state-msg">No picks submitted yet.</div>';
 }
 
@@ -559,22 +588,32 @@ function renderPicks(t, existingPick) {
           <input type="text" id="picksName" class="field-input" placeholder="Full name" value="${existingPick?.name||''}">
         </div>
 
-        ${tiers.map((tier, ti) => `
+        ${!isWeekend ? `
+        <div class="field-group">
+          <label class="field-label">Email Address</label>
+          <input type="email" id="picksEmail" class="field-input" placeholder="your@email.com" value="${existingPick?.email||''}">
+          <div style="font-size:10px;color:rgba(245,240,232,0.35);margin-top:4px;letter-spacing:0.5px">Used for tournament updates only.</div>
+        </div>` : ''}
+
+        ${tiers.map((tier, ti) => {
+          const sorted = [...(tier.golfers||[])].sort((a,b) => a.localeCompare(b));
+          const selVal = existing[ti] || '';
+          return `
           <div class="field-group">
             <label class="field-label">Tier ${ti+1}</label>
-            <div class="tier-grid">
-              ${(tier.golfers||[]).map(g => {
-                const sel = existing[ti] === g;
+            <select class="field-input picks-select" id="tier-select-${ti}"
+              onchange="selectGolferFromDropdown(${ti}, this.value)">
+              <option value="">-- Select a golfer --</option>
+              ${sorted.map(g => {
                 const score = getGolferCurrentScore(g);
-                return `<div class="golfer-option ${sel?'selected':''}" onclick="selectGolfer(${ti}, '${g.replace(/'/g,"\\'")}', this)">
-                  <div class="go-name">${g}</div>
-                  <div class="go-score ${totalCls(score)}">${fmtScore(score)}</div>
-                </div>`;
+                const scoreStr = score === null ? '' : ' (' + fmtScore(score) + ')';
+                return '<option value="' + g + '" ' + (selVal===g?'selected':'') + '>' + g + scoreStr + '</option>';
               }).join('')}
-            </div>
-          </div>`).join('')}
+            </select>
+          </div>`;
+        }).join('')}
 
-        <button class="btn-gold btn-full" onclick="submitPicks('${t.id}', '${phase}', ${JSON.stringify(tiers.map((_,i)=>i)).replace(/"/g,'')})">
+        <button class="btn-gold btn-full" onclick="submitPicks('${t.id}', '${phase}')">
           ${existingPick ? 'Update Picks' : 'Submit Picks'}
         </button>
       </div>
@@ -585,10 +624,14 @@ function renderPicks(t, existingPick) {
 }
 
 function selectGolfer(tierIdx, golferName, el) {
-  // Deselect others in same tier
   const tierGrids = document.querySelectorAll('.tier-grid');
   tierGrids[tierIdx]?.querySelectorAll('.golfer-option').forEach(o => o.classList.remove('selected'));
   el.classList.add('selected');
+  if (!window._pickSelections) window._pickSelections = [];
+  window._pickSelections[tierIdx] = golferName;
+}
+
+function selectGolferFromDropdown(tierIdx, golferName) {
   if (!window._pickSelections) window._pickSelections = [];
   window._pickSelections[tierIdx] = golferName;
 }
@@ -604,15 +647,20 @@ function getGolferCurrentScore(golferName) {
   return played.length ? played[played.length-1] : null;
 }
 
-async function submitPicks(tournamentId, phase, tierIndices) {
+async function submitPicks(tournamentId, phase) {
   const name = document.getElementById('picksName')?.value?.trim();
   if (!name) { alert('Please enter your name.'); return; }
+
+  const isWeekday = phase === 'r1golfers';
+  const email = isWeekday ? (document.getElementById('picksEmail')?.value?.trim() || '') : null;
 
   const selections = window._pickSelections || [];
   const t = state.activeTournament;
   const tiers = t.tiers || [];
 
-  if (selections.filter(Boolean).length < tiers.length) {
+  // Validate — check each tier has a selection
+  const missing = tiers.map((_,i) => selections[i]).filter(v => !v);
+  if (missing.length > 0) {
     alert('Please select one golfer from each tier.');
     return;
   }
@@ -627,7 +675,8 @@ async function submitPicks(tournamentId, phase, tierIndices) {
     [phase]: selections,
   };
 
-  if (!existing) data.r1golfers = selections; // default
+  if (isWeekday && email) data.email = email;
+  if (!existing) data.r1golfers = selections;
 
   try {
     await savePick(tournamentId, existing?.id || null, data);
@@ -824,6 +873,7 @@ async function managePicks(tournamentId) {
         <thead>
           <tr>
             <th>Name</th>
+            <th>Email</th>
             <th>Paid</th>
             <th>Thu/Fri Picks</th>
             <th>Sat/Sun Picks</th>
@@ -836,6 +886,9 @@ async function managePicks(tournamentId) {
               <td>
                 <input type="text" class="pick-edit-input" id="pname-${pick.id}"
                   value="${(pick.name||'').replace(/"/g,'&quot;')}">
+              </td>
+              <td>
+                <div style="font-size:11px;color:rgba(245,240,232,0.5)">${pick.email||'—'}</div>
               </td>
               <td style="text-align:center">
                 <input type="checkbox" class="paid-checkbox" id="paid-${pick.id}"
@@ -1101,7 +1154,8 @@ window.toggleNewPickForm     = toggleNewPickForm;
 window.addNewPick            = addNewPick;
 window.savePickEdit          = savePickEdit;
 window.deletePick            = deletePick;
-window.submitPicksForPhase   = submitPicksForPhase;
+window.submitPicksForPhase        = submitPicksForPhase;
+window.selectGolferFromDropdown   = selectGolferFromDropdown;
 
 navigate('home');
 </script>
@@ -1346,6 +1400,12 @@ h1 span { color:var(--gold); font-style:italic; }
 }
 .field-input:focus { border-color:var(--gold); }
 .tier-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:8px; }
+.picks-select {
+  background:rgba(255,255,255,0.05); color:var(--cream);
+  font-family:'DM Mono',monospace; cursor:pointer;
+}
+.picks-select option { background:#1a3a2a; color:var(--cream); }
+
 .golfer-option {
   background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
   padding:10px 12px; cursor:pointer; transition:all 0.15s;
@@ -1377,6 +1437,32 @@ h1 span { color:var(--gold); font-style:italic; }
 /* LOGIN */
 .view-login { display:flex; justify-content:center; align-items:center; min-height:60vh; }
 .login-card  { background:rgba(255,255,255,0.04); border:1px solid rgba(201,168,76,0.3); padding:32px; width:100%; max-width:360px; text-align:center; }
+
+/* UNPAID SECTION */
+.unpaid-section {
+  margin-top: 24px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding-top: 16px;
+}
+.unpaid-header {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #e67e73;
+  margin-bottom: 10px;
+}
+.unpaid-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.unpaid-item {
+  background: rgba(192,57,43,0.12);
+  border: 1px solid rgba(192,57,43,0.25);
+  color: rgba(245,240,232,0.7);
+  font-size: 12px;
+  padding: 6px 12px;
+}
 
 /* PICKS MANAGER */
 .picks-manager { padding:12px 0; overflow-x:auto; }
