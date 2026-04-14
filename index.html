@@ -74,12 +74,11 @@ function navigate(view, data = {}) {
   state.view        = view;
   state.expandedRow = null;
   if (data.tournament) state.activeTournament = data.tournament;
-  render();
-  if (view === 'leaderboard' && state.activeTournament) loadLeaderboard();
-  if (view === 'picks'       && state.activeTournament) loadPicks();
-  if (view === 'admin')                                  loadAdmin();
-  if (view === 'home')                                   loadHome();
-  if (view === 'archive')                                loadArchive();
+  if      (view === 'leaderboard' && state.activeTournament) loadLeaderboard();
+  else if (view === 'picks'       && state.activeTournament) loadPicks();
+  else if (view === 'admin')                                  loadAdmin();
+  else if (view === 'archive')                                loadArchive();
+  else                                                        loadHome();
 }
 
 // ── FIRESTORE HELPERS ────────────────────────────────────────────────────────
