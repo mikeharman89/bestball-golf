@@ -52,7 +52,9 @@ let state = {
 onAuthStateChanged(auth, async user => {
   state.user    = user;
   state.isAdmin = user?.email === ADMIN_EMAIL;
-  render();
+  if (state.view === 'home') renderHome();
+  else if (state.view === 'leaderboard') renderLeaderboard();
+  else if (state.view === 'admin') renderAdmin();
 });
 
 async function adminLogin(email, password) {
