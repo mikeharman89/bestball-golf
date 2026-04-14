@@ -31,7 +31,7 @@ const auth = getAuth(app);
 const db   = getFirestore(app);
 
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
-const ADMIN_EMAIL = 'mike.harman18@gmail.com'; // e.g. 'you@gmail.com'
+const ADMIN_EMAIL = 'SET_YOUR_ADMIN_EMAIL_HERE'; // e.g. 'you@gmail.com'
 const PARS = [4,5,4,3,4,3,4,5,4,4,4,3,5,4,5,3,4,4];
 
 // ── STATE ────────────────────────────────────────────────────────────────────
@@ -848,7 +848,7 @@ async function managePicks(tournamentId) {
         </tbody>
       </table>
       <div style="margin-top:12px">
-        <button class="btn-gold" onclick="toggleNewPickForm('new-pick-${tournamentId}')">+ Add Entry</button>
+        <button class="btn-gold" onclick="toggleNewPickForm('new-pick-' + tournamentId)">+ Add Entry</button>
         <div id="new-pick-${tournamentId}" style="display:none;margin-top:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(201,168,76,0.2);padding:16px">
           <div class="section-label" style="margin-bottom:12px">New Entry</div>
           <div class="field-group">
@@ -857,11 +857,25 @@ async function managePicks(tournamentId) {
           </div>
           <div class="field-group">
             <label class="field-label">Thu &amp; Fri Picks</label>
-            ${[0,1,2,3].map(i => '<div class="pick-golfer-row" style="margin-bottom:6px"><span class="pick-tier">T'+(i+1)+'</span><input type="text" class="pick-edit-input pick-golfer-input" id="new-r1-${tournamentId}-'+i+'" placeholder="Golfer name"></div>').join('')}
+            ${tiers.map((tier, i) => `
+              <div class="pick-golfer-row" style="margin-bottom:6px">
+                <span class="pick-tier">T${i+1}</span>
+                <select class="pick-edit-input pick-golfer-input" id="new-r1-${tournamentId}-${i}">
+                  <option value="">-- Select golfer --</option>
+                  ${(tier.golfers||[]).map(g => `<option value="${g}">${g}</option>`).join('')}
+                </select>
+              </div>`).join('')}
           </div>
           <div class="field-group">
             <label class="field-label">Sat &amp; Sun Picks <span style="opacity:.4;font-size:9px">(optional)</span></label>
-            ${[0,1,2,3].map(i => '<div class="pick-golfer-row" style="margin-bottom:6px"><span class="pick-tier">T'+(i+1)+'</span><input type="text" class="pick-edit-input pick-golfer-input" id="new-r2-${tournamentId}-'+i+'" placeholder="Golfer name"></div>').join('')}
+            ${tiers.map((tier, i) => `
+              <div class="pick-golfer-row" style="margin-bottom:6px">
+                <span class="pick-tier">T${i+1}</span>
+                <select class="pick-edit-input pick-golfer-input" id="new-r2-${tournamentId}-${i}">
+                  <option value="">-- Select golfer --</option>
+                  ${(tier.golfers||[]).map(g => `<option value="${g}">${g}</option>`).join('')}
+                </select>
+              </div>`).join('')}
           </div>
           <div style="display:flex;gap:8px;margin-top:4px">
             <button class="btn-gold" onclick="addNewPick('${tournamentId}')">Save Entry</button>
@@ -883,13 +897,13 @@ async function addNewPick(tournamentId) {
   if (!name) { alert('Please enter a name.'); return; }
 
   const r1golfers = [0,1,2,3].map(i =>
-    document.getElementById(`new-r1-${tournamentId}-${i}`)?.value?.trim() || ''
+    document.getElementById('new-r1-' + tournamentId + '-' + i)?.value?.trim() || ''
   ).filter(Boolean);
 
-  if (r1golfers.length < 4) { alert('Please enter all 4 Thu/Fri golfers.'); return; }
+  if (r1golfers.length < 4) { alert('Please select all 4 Thu/Fri golfers.'); return; }
 
-  const r2inputs  = [0,1,2,3].map(i =>
-    document.getElementById(`new-r2-${tournamentId}-${i}`)?.value?.trim() || ''
+  const r2inputs = [0,1,2,3].map(i =>
+    document.getElementById('new-r2-' + tournamentId + '-' + i)?.value?.trim() || ''
   );
   const r2golfers = r2inputs.filter(Boolean);
 
@@ -1355,6 +1369,12 @@ h1 span { color:var(--gold); font-style:italic; }
 .pick-actions { display:flex; flex-direction:column; gap:4px; }
 .pick-golfers { min-width:180px; }
 .paid-checkbox { width:16px; height:16px; cursor:pointer; accent-color:var(--gold); }
+.pick-edit-input select, select.pick-edit-input {
+  background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);
+  color:var(--cream); font-family:'DM Mono',monospace; font-size:11px; padding:5px 8px;
+  width:100%; outline:none; cursor:pointer;
+}
+select.pick-edit-input option { background:#1a3a2a; color:var(--cream); }
 
 /* MISC */
 .state-msg { text-align:center; padding:60px 20px; color:rgba(245,240,232,0.5); font-size:13px; letter-spacing:1px; }
