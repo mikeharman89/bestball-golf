@@ -787,10 +787,25 @@ async function managePicks(tournamentId) {
   el.innerHTML = `
     <div class="picks-manager">
       <div class="section-label" style="margin-top:16px">Manage Picks</div>
+      <div style="margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div style="font-size:11px;color:rgba(245,240,232,0.5)">
+          Paid: <strong style="color:var(--gold)">${picks.filter(p=>p.paid).length}</strong> /
+          <strong>${picks.length}</strong>
+        </div>
+        <button class="btn-sm" onclick="toggleUnpaidList('unpaid-${tournamentId}')">Show Unpaid</button>
+      </div>
+      <div id="unpaid-${tournamentId}" style="display:none;margin-bottom:16px;background:rgba(192,57,43,0.1);border:1px solid rgba(192,57,43,0.3);padding:12px">
+        <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#e67e73;margin-bottom:8px">Unpaid</div>
+        ${picks.filter(p=>!p.paid).length === 0
+          ? '<div style="font-size:11px;color:rgba(245,240,232,0.4)">Everyone has paid! 🎉</div>'
+          : picks.filter(p=>!p.paid).map(p=>`<div style="font-size:12px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.05)">${p.name||'Unknown'}</div>`).join('')
+        }
+      </div>
       <table class="picks-table">
         <thead>
           <tr>
             <th>Name</th>
+            <th>Paid</th>
             <th>Thu/Fri Picks</th>
             <th>Sat/Sun Picks</th>
             <th>Actions</th>
@@ -802,6 +817,11 @@ async function managePicks(tournamentId) {
               <td>
                 <input type="text" class="pick-edit-input" id="pname-${pick.id}"
                   value="${(pick.name||'').replace(/"/g,'&quot;')}">
+              </td>
+              <td style="text-align:center">
+                <input type="checkbox" class="paid-checkbox" id="paid-${pick.id}"
+                  ${pick.paid ? 'checked' : ''}
+                  onchange="togglePaid('${tournamentId}', '${pick.id}', this.checked)">
               </td>
               <td class="pick-golfers">
                 ${(pick.r1golfers||[]).map((g,i) => `
@@ -828,6 +848,20 @@ async function managePicks(tournamentId) {
         </tbody>
       </table>
     </div>`;
+}
+
+function toggleUnpaidList(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function togglePaid(tournamentId, pickId, paid) {
+  try {
+    await updateDoc(doc(db, 'tournaments', tournamentId, 'picks', pickId), { paid });
+  } catch(e) {
+    alert('Error saving payment status: ' + e.message);
+  }
 }
 
 async function savePickEdit(tournamentId, pickId) {
@@ -954,6 +988,8 @@ window.saveTiers             = saveTiers;
 window.savePhase             = savePhase;
 window.editTournament        = editTournament;
 window.managePicks           = managePicks;
+window.togglePaid            = togglePaid;
+window.toggleUnpaidList      = toggleUnpaidList;
 window.savePickEdit          = savePickEdit;
 window.deletePick            = deletePick;
 window.submitPicksForPhase   = submitPicksForPhase;
@@ -1253,6 +1289,7 @@ h1 span { color:var(--gold); font-style:italic; }
 .pick-tier { font-size:9px; color:rgba(201,168,76,0.6); letter-spacing:1px; white-space:nowrap; }
 .pick-actions { display:flex; flex-direction:column; gap:4px; }
 .pick-golfers { min-width:180px; }
+.paid-checkbox { width:16px; height:16px; cursor:pointer; accent-color:var(--gold); }
 
 /* MISC */
 .state-msg { text-align:center; padding:60px 20px; color:rgba(245,240,232,0.5); font-size:13px; letter-spacing:1px; }
