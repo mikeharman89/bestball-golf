@@ -889,8 +889,20 @@ function showAdminLogin() {
 async function doAdminLogin() {
   const email = document.getElementById('adminEmail').value;
   const pass  = document.getElementById('adminPass').value;
-  await adminLogin(email, pass);
-  if (state.isAdmin) navigate('admin');
+  if (!email || !pass) { alert('Please enter email and password.'); return; }
+  try {
+    const cred = await signInWithEmailAndPassword(auth, email, pass);
+    if (cred.user?.email === ADMIN_EMAIL) {
+      state.user    = cred.user;
+      state.isAdmin = true;
+      navigate('admin');
+    } else {
+      alert('Not an admin account.');
+      await signOut(auth);
+    }
+  } catch(e) {
+    alert('Login failed: ' + e.message);
+  }
 }
 
 async function doSignOut() {
