@@ -31,7 +31,7 @@ const auth = getAuth(app);
 const db   = getFirestore(app);
 
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
-const ADMIN_EMAIL = 'mike.harman18@gmail.com'; // e.g. 'you@gmail.com'
+const ADMIN_EMAIL = 'SET_YOUR_ADMIN_EMAIL_HERE'; // e.g. 'you@gmail.com'
 const PARS = [4,5,4,3,4,3,4,5,4,4,4,3,5,4,5,3,4,4];
 
 // ── STATE ────────────────────────────────────────────────────────────────────
@@ -245,7 +245,8 @@ function renderHome() {
             <div class="tc-name">${t.name}</div>
             <div class="tc-dates">${t.dates || ''}</div>
             <div class="tc-actions">
-              <button class="btn-gold" onclick="event.stopPropagation(); navigate('picks', {tournament: ${JSON.stringify(t).replace(/"/g,'&quot;')}})">Submit Picks</button>
+              <button class="btn-gold" onclick="event.stopPropagation(); submitPicksForPhase(${JSON.stringify(t).replace(/"/g,'&quot;')}, 'weekday')">Thu &amp; Fri Picks</button>
+              <button class="btn-gold" onclick="event.stopPropagation(); submitPicksForPhase(${JSON.stringify(t).replace(/"/g,'&quot;')}, 'weekend')">Sat &amp; Sun Picks</button>
               <button class="btn-outline" onclick="event.stopPropagation(); navigate('leaderboard', {tournament: ${JSON.stringify(t).replace(/"/g,'&quot;')}})">Leaderboard →</button>
             </div>
           </div>`).join('')}
@@ -501,6 +502,12 @@ function buildOverallBoard() {
 }
 
 // PICKS
+function submitPicksForPhase(tournament, phase) {
+  // Override the tournament's picksPhase with the explicitly chosen phase
+  const t = { ...tournament, picksPhase: phase };
+  navigate('picks', { tournament: t });
+}
+
 async function loadPicks() {
   await anonLogin();
   showLoading('appRoot');
@@ -680,9 +687,11 @@ function renderAdmin() {
               </button>
               <button class="btn-sm" onclick="archiveTournament('${tournament.id}')">Archive</button>
               <button class="btn-sm" onclick="navigate('leaderboard', {tournament: ${JSON.stringify(tournament).replace(/"/g,'&quot;')}})">View →</button>
+              <button class="btn-sm" onclick="managePicks('${tournament.id}')">Picks</button>
             </div>
           </div>
           <div id="tiers-${tournament.id}" style="display:none"></div>
+          <div id="picks-${tournament.id}" style="display:none"></div>
         </div>`).join('')}
     </div>`;
 }
@@ -758,6 +767,98 @@ async function saveTiers(tournamentId) {
   });
   await updateDoc(doc(db, 'tournaments', tournamentId), { tiers });
   alert('Tiers saved!');
+}
+
+async function managePicks(tournamentId) {
+  const el = document.getElementById('picks-' + tournamentId);
+  if (el.style.display !== 'none') { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = '<div class="state-msg"><div class="spinner"></div>Loading picks…</div>';
+
+  const picks = await getPicks(tournamentId);
+  if (!picks.length) {
+    el.innerHTML = '<div style="padding:16px;font-size:12px;color:rgba(245,240,232,0.4)">No picks submitted yet.</div>';
+    return;
+  }
+
+  // Sort by name
+  picks.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+
+  el.innerHTML = `
+    <div class="picks-manager">
+      <div class="section-label" style="margin-top:16px">Manage Picks</div>
+      <table class="picks-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Thu/Fri Picks</th>
+            <th>Sat/Sun Picks</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${picks.map(pick => `
+            <tr id="pick-row-${pick.id}">
+              <td>
+                <input type="text" class="pick-edit-input" id="pname-${pick.id}"
+                  value="${(pick.name||'').replace(/"/g,'&quot;')}">
+              </td>
+              <td class="pick-golfers">
+                ${(pick.r1golfers||[]).map((g,i) => `
+                  <div class="pick-golfer-row">
+                    <span class="pick-tier">T${i+1}</span>
+                    <input type="text" class="pick-edit-input pick-golfer-input"
+                      id="p-${pick.id}-r1-${i}" value="${(g||'').replace(/"/g,'&quot;')}">
+                  </div>`).join('')}
+              </td>
+              <td class="pick-golfers">
+                ${(pick.r2golfers||[]).map((g,i) => `
+                  <div class="pick-golfer-row">
+                    <span class="pick-tier">T${i+1}</span>
+                    <input type="text" class="pick-edit-input pick-golfer-input"
+                      id="p-${pick.id}-r2-${i}" value="${(g||'').replace(/"/g,'&quot;')}">
+                  </div>`).join('')}
+                ${!(pick.r2golfers||[]).length ? '<span style="opacity:.4;font-size:11px">No weekend picks</span>' : ''}
+              </td>
+              <td class="pick-actions">
+                <button class="btn-sm" onclick="savePickEdit('${tournamentId}', '${pick.id}')">Save</button>
+                <button class="btn-sm btn-sm-red" onclick="deletePick('${tournamentId}', '${pick.id}')">Delete</button>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+async function savePickEdit(tournamentId, pickId) {
+  const name = document.getElementById('pname-' + pickId)?.value?.trim();
+  if (!name) { alert('Name cannot be empty'); return; }
+
+  // Collect r1 golfers
+  const r1golfers = [0,1,2,3].map(i => document.getElementById(`p-${pickId}-r1-${i}`)?.value?.trim() || '').filter(Boolean);
+  // Collect r2 golfers if they exist
+  const r2inputs  = [0,1,2,3].map(i => document.getElementById(`p-${pickId}-r2-${i}`)?.value?.trim() || '');
+  const r2golfers = r2inputs.filter(Boolean);
+
+  const data = { name, r1golfers };
+  if (r2golfers.length) data.r2golfers = r2golfers;
+
+  try {
+    await updateDoc(doc(db, 'tournaments', tournamentId, 'picks', pickId), data);
+    alert('Pick saved ✓');
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function deletePick(tournamentId, pickId) {
+  if (!confirm('Delete this pick? This cannot be undone.')) return;
+  try {
+    await deleteDoc(doc(db, 'tournaments', tournamentId, 'picks', pickId));
+    document.getElementById('pick-row-' + pickId)?.remove();
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
 }
 
 async function editTournament(id) {
@@ -840,6 +941,10 @@ window.manageTiers           = manageTiers;
 window.saveTiers             = saveTiers;
 window.savePhase             = savePhase;
 window.editTournament        = editTournament;
+window.managePicks           = managePicks;
+window.savePickEdit          = savePickEdit;
+window.deletePick            = deletePick;
+window.submitPicksForPhase   = submitPicksForPhase;
 
 navigate('home');
 </script>
@@ -1115,6 +1220,27 @@ h1 span { color:var(--gold); font-style:italic; }
 /* LOGIN */
 .view-login { display:flex; justify-content:center; align-items:center; min-height:60vh; }
 .login-card  { background:rgba(255,255,255,0.04); border:1px solid rgba(201,168,76,0.3); padding:32px; width:100%; max-width:360px; text-align:center; }
+
+/* PICKS MANAGER */
+.picks-manager { padding:12px 0; overflow-x:auto; }
+.picks-table { width:100%; border-collapse:collapse; font-size:11px; min-width:600px; }
+.picks-table th {
+  text-align:left; font-size:9px; letter-spacing:2px; text-transform:uppercase;
+  color:rgba(201,168,76,0.7); padding:8px 10px; border-bottom:1px solid rgba(201,168,76,0.2);
+}
+.picks-table td { padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.05); vertical-align:top; }
+.picks-table tr:hover td { background:rgba(255,255,255,0.03); }
+.pick-edit-input {
+  background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);
+  color:var(--cream); font-family:'DM Mono',monospace; font-size:11px;
+  padding:5px 8px; width:100%; outline:none;
+}
+.pick-edit-input:focus { border-color:var(--gold); }
+.pick-golfer-row { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+.pick-golfer-input { flex:1; }
+.pick-tier { font-size:9px; color:rgba(201,168,76,0.6); letter-spacing:1px; white-space:nowrap; }
+.pick-actions { display:flex; flex-direction:column; gap:4px; }
+.pick-golfers { min-width:180px; }
 
 /* MISC */
 .state-msg { text-align:center; padding:60px 20px; color:rgba(245,240,232,0.5); font-size:13px; letter-spacing:1px; }
