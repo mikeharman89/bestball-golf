@@ -1480,10 +1480,22 @@ h1 span { color:var(--gold); font-style:italic; }
 .field-input:focus { border-color:var(--gold); }
 .tier-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:8px; }
 .picks-select {
-  background:rgba(255,255,255,0.05); color:var(--cream);
+  background:#1f3d2c !important; color:var(--cream) !important;
   font-family:'DM Mono',monospace; cursor:pointer;
 }
-.picks-select option { background:#1a3a2a; color:var(--cream); }
+.picks-select option { background:#1f3d2c !important; color:var(--cream) !important; }
+
+/* Force all selects in the app to use dark theme */
+select, select.field-input, select.pick-edit-input {
+  background:#1f3d2c !important;
+  color:var(--cream) !important;
+  border:1px solid rgba(201,168,76,0.2) !important;
+  font-family:'DM Mono',monospace !important;
+}
+select option {
+  background:#1f3d2c !important;
+  color:var(--cream) !important;
+}
 
 .golfer-option {
   background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
