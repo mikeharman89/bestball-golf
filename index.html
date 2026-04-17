@@ -458,79 +458,168 @@ function buildRoundBoard(roundKey) {
   return html;
 }
 
+function getPlayerRoundTotal(data, roundKey) {
+  const scores = data[roundKey] || [];
+  let cum = 0, started = false;
+  let last = null;
+  for (let i=0; i<18; i++) {
+    if (scores[i] !== null && scores[i] !== undefined) {
+      cum += scores[i] - PARS[i];
+      last = cum;
+      started = true;
+    } else if (started) break;
+  }
+  return last;
+}
+
+function getPlayerRoundRunning(data, roundKey) {
+  const scores = data[roundKey] || [];
+  const result = Array(18).fill(null);
+  let cum = 0, started = false;
+  for (let i=0; i<18; i++) {
+    if (scores[i] !== null && scores[i] !== undefined) {
+      cum += scores[i] - PARS[i];
+      result[i] = cum;
+      started = true;
+    } else if (started) break;
+  }
+  return result;
+}
+
 function buildFieldBoard() {
-  const search = (document.getElementById('searchInput')?.value||'').toLowerCase();
-  const r = detectCurrentRound();
-  const roundKey = r ? 'r'+r : 'r1';
-  const roundLabels = {r1:'Round 1',r2:'Round 2',r3:'Round 3',r4:'Round 4'};
+  const search   = (document.getElementById('searchInput')?.value||'').toLowerCase();
+  const tab      = state.currentTab; // 'field' triggers overall; field sub-tabs use state.fieldTab
+  const fieldTab = state.fieldTab || 'overall';
+  const roundLabels = {r1:'Round 1 — Thursday', r2:'Round 2 — Friday', r3:'Round 3 — Saturday', r4:'Round 4 — Sunday'};
 
-  // Build a row for every player in the Masters feed
-  let players = Object.entries(state.mastersData).map(([name, data]) => {
-    const roundScores = data[roundKey] || [];
-    const perHole = Array(18).fill(null);
-    let cum = 0, started = false;
-    const runningArr = Array(18).fill(null);
-    for (let i=0; i<18; i++) {
-      if (roundScores[i] !== null && roundScores[i] !== undefined) {
-        perHole[i] = roundScores[i] - PARS[i];
-        cum += perHole[i];
-        runningArr[i] = cum;
-        started = true;
-      } else if (started) break;
-    }
-    const played = runningArr.filter(v=>v!==null);
-    const total  = played.length ? played[played.length-1] : null;
-    const thru   = played.length;
-    return { name, runningArr, perHole, total, thru };
-  });
-
-  // Sort by total
-  players.sort((a,b) => {
-    if (a.total===null && b.total===null) return 0;
-    if (a.total===null) return 1; if (b.total===null) return -1;
-    return a.total - b.total;
-  });
-
-  // Assign ranks
-  let rank=1;
-  players.forEach((p,i) => {
-    if (i>0 && p.total!==players[i-1].total) rank=i+1;
-    p.rankNum=rank;
-    p.rankLabel=p.total===null?'—':rank===1?'1st':rank===2?'2nd':rank===3?'3rd':'T'+rank;
-  });
-
-  if (search) players = players.filter(p => p.name.toLowerCase().includes(search));
-
-  const holeNums = Array.from({length:18},(_,i)=>i+1);
-
-  let html = `<div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,0.6);margin-bottom:12px;">
-    Field Leaderboard — ${roundLabels[roundKey]||''}
-    <span style="margin-left:12px;color:rgba(245,240,232,0.3)">${players.length} players</span>
-  </div>
-  <div class="leaderboard">
-    <div class="lb-header" style="grid-template-columns:52px 200px 58px 52px repeat(18,1fr)">
-      <div class="lb-cell">POS</div>
-      <div class="lb-cell" style="padding-left:6px">GOLFER</div>
-      <div class="lb-cell" style="justify-content:center">TOT</div>
-      <div class="lb-cell" style="justify-content:center">THRU</div>
-      ${holeNums.map(h=>`<div class="lb-cell" style="justify-content:center;font-size:9px">${h}</div>`).join('')}
+  // Sub-tab bar for field
+  const fieldTabs = ['overall','r1','r2','r3','r4'];
+  const fieldTabLabels = {overall:'Overall', r1:'Round 1', r2:'Round 2', r3:'Round 3', r4:'Round 4'};
+  const subTabsHtml = `
+    <div class="field-subtabs">
+      ${fieldTabs.map(ft => `
+        <button class="field-subtab ${fieldTab===ft?'active':''}" onclick="setFieldTab('${ft}')">${fieldTabLabels[ft]}</button>
+      `).join('')}
     </div>`;
 
-  players.forEach(p => {
-    const isTop3 = p.rankNum<=3 && p.total!==null;
-    const holeCells = p.runningArr.map((v,i)=>`<div class="lb-cell hole-score ${holeCls(v,p.runningArr[i-1]??null)}">${fmtHole(v)}</div>`).join('');
-    html += `
-    <div class="lb-row ${isTop3?'top-3':''}" style="grid-template-columns:52px 200px 58px 52px repeat(18,1fr);cursor:default">
-      <div class="lb-cell rank ${p.rankNum<=3&&p.total!==null?'gold':''}">${p.rankLabel}</div>
-      <div class="lb-cell name">${p.name}</div>
-      <div class="lb-cell total ${totalCls(p.total)}">${fmtScore(p.total)}</div>
-      <div class="lb-cell thru">${p.thru>0?p.thru:'—'}</div>
-      ${holeCells}
-    </div>`;
-  });
+  if (fieldTab === 'overall') {
+    // Overall: show R1 R2 R3 R4 totals per golfer
+    let players = Object.entries(state.mastersData).map(([name, data]) => {
+      const r1 = getPlayerRoundTotal(data,'r1');
+      const r2 = getPlayerRoundTotal(data,'r2');
+      const r3 = getPlayerRoundTotal(data,'r3');
+      const r4 = getPlayerRoundTotal(data,'r4');
+      const rounds = [r1,r2,r3,r4];
+      const total  = rounds.some(v=>v!==null) ? rounds.reduce((s,v)=>s+(v??0),0) : null;
+      return { name, r1, r2, r3, r4, total };
+    });
 
-  html += '</div>';
-  return players.length ? html : '<div class="state-msg">No field data available.</div>';
+    players.sort((a,b) => {
+      if (a.total===null&&b.total===null) return 0;
+      if (a.total===null) return 1; if (b.total===null) return -1;
+      return a.total - b.total;
+    });
+
+    let rank=1;
+    players.forEach((p,i) => {
+      if (i>0&&p.total!==players[i-1].total) rank=i+1;
+      p.rankNum=rank;
+      p.rankLabel=p.total===null?'—':rank===1?'1st':rank===2?'2nd':rank===3?'3rd':'T'+rank;
+    });
+
+    if (search) players = players.filter(p=>p.name.toLowerCase().includes(search));
+
+    let html = subTabsHtml + `
+    <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,0.6);margin-bottom:12px;">
+      Field — Overall Standings <span style="margin-left:12px;color:rgba(245,240,232,0.3)">${players.length} players</span>
+    </div>
+    <div class="leaderboard">
+      <div class="lb-header" style="grid-template-columns:52px 200px 70px 70px 70px 70px 90px">
+        <div class="lb-cell">POS</div>
+        <div class="lb-cell" style="padding-left:6px">GOLFER</div>
+        <div class="lb-cell" style="justify-content:center">R1</div>
+        <div class="lb-cell" style="justify-content:center">R2</div>
+        <div class="lb-cell" style="justify-content:center">R3</div>
+        <div class="lb-cell" style="justify-content:center">R4</div>
+        <div class="lb-cell" style="justify-content:center">TOTAL</div>
+      </div>`;
+
+    players.forEach(p => {
+      const isTop3 = p.rankNum<=3&&p.total!==null;
+      html += `
+      <div class="lb-row ${isTop3?'top-3':''}" style="grid-template-columns:52px 200px 70px 70px 70px 70px 90px;cursor:default">
+        <div class="lb-cell rank ${p.rankNum<=3&&p.total!==null?'gold':''}">${p.rankLabel}</div>
+        <div class="lb-cell name">${p.name}</div>
+        <div class="lb-cell round-col ${totalCls(p.r1)}">${fmtScore(p.r1)}</div>
+        <div class="lb-cell round-col ${totalCls(p.r2)}">${fmtScore(p.r2)}</div>
+        <div class="lb-cell round-col ${totalCls(p.r3)}">${fmtScore(p.r3)}</div>
+        <div class="lb-cell round-col ${totalCls(p.r4)}">${fmtScore(p.r4)}</div>
+        <div class="lb-cell overall-total ${totalCls(p.total)}">${fmtScore(p.total)}</div>
+      </div>`;
+    });
+
+    html += '</div>';
+    return players.length ? html : '<div class="state-msg">No field data available.</div>';
+
+  } else {
+    // Individual round: hole-by-hole
+    const roundKey = fieldTab;
+    let players = Object.entries(state.mastersData).map(([name, data]) => {
+      const runningArr = getPlayerRoundRunning(data, roundKey);
+      const played     = runningArr.filter(v=>v!==null);
+      const total      = played.length ? played[played.length-1] : null;
+      const thru       = played.length;
+      const teetime    = data.teetimes?.[roundKey] || '';
+      return { name, runningArr, total, thru, teetime };
+    });
+
+    players.sort((a,b) => {
+      if (a.total===null&&b.total===null) return 0;
+      if (a.total===null) return 1; if (b.total===null) return -1;
+      return a.total - b.total;
+    });
+
+    let rank=1;
+    players.forEach((p,i) => {
+      if (i>0&&p.total!==players[i-1].total) rank=i+1;
+      p.rankNum=rank;
+      p.rankLabel=p.total===null?'—':rank===1?'1st':rank===2?'2nd':rank===3?'3rd':'T'+rank;
+    });
+
+    if (search) players = players.filter(p=>p.name.toLowerCase().includes(search));
+
+    const holeNums = Array.from({length:18},(_,i)=>i+1);
+
+    let html = subTabsHtml + `
+    <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,0.6);margin-bottom:12px;">
+      Field — ${roundLabels[roundKey]||''} <span style="margin-left:12px;color:rgba(245,240,232,0.3)">${players.length} players</span>
+    </div>
+    <div class="leaderboard">
+      <div class="lb-header" style="grid-template-columns:52px 200px 58px 52px repeat(18,1fr)">
+        <div class="lb-cell">POS</div>
+        <div class="lb-cell" style="padding-left:6px">GOLFER</div>
+        <div class="lb-cell" style="justify-content:center">TOT</div>
+        <div class="lb-cell" style="justify-content:center">THRU</div>
+        ${holeNums.map(h=>`<div class="lb-cell" style="justify-content:center;font-size:9px">${h}</div>`).join('')}
+      </div>`;
+
+    players.forEach(p => {
+      const isTop3  = p.rankNum<=3&&p.total!==null;
+      const thruLbl = p.thru===18?'F':p.thru>0?p.thru:p.teetime?p.teetime+' EDT':'—';
+      const holeCells = p.runningArr.map((v,i)=>`<div class="lb-cell hole-score ${holeCls(v,p.runningArr[i-1]??null)}">${fmtHole(v)}</div>`).join('');
+      html += `
+      <div class="lb-row ${isTop3?'top-3':''}" style="grid-template-columns:52px 200px 58px 52px repeat(18,1fr);cursor:default">
+        <div class="lb-cell rank ${p.rankNum<=3&&p.total!==null?'gold':''}">${p.rankLabel}</div>
+        <div class="lb-cell name">${p.name}</div>
+        <div class="lb-cell total ${totalCls(p.total)}">${fmtScore(p.total)}</div>
+        <div class="lb-cell thru">${thruLbl}</div>
+        ${holeCells}
+      </div>`;
+    });
+
+    html += '</div>';
+    return players.length ? html : '<div class="state-msg">No data for this round yet.</div>';
+  }
 }
 
 function buildOverallBoard() {
@@ -1269,6 +1358,12 @@ async function doSignOut() {
 function setTab(tab) {
   state.currentTab  = tab;
   state.expandedRow = null;
+  if (tab !== 'field') state.fieldTab = 'overall'; // reset field sub-tab on main tab switch
+  renderLeaderboard();
+}
+
+function setFieldTab(ft) {
+  state.fieldTab = ft;
   renderLeaderboard();
 }
 
@@ -1293,6 +1388,7 @@ function showLoading(id) {
 // ── INIT ─────────────────────────────────────────────────────────────────────
 window.navigate      = navigate;
 window.setTab        = setTab;
+window.setFieldTab   = setFieldTab;
 window.toggleExpand  = toggleExpand;
 window.toggleGolfer  = toggleGolfer;
 window.selectGolfer  = selectGolfer;
@@ -1614,6 +1710,34 @@ select option {
 /* LOGIN */
 .view-login { display:flex; justify-content:center; align-items:center; min-height:60vh; }
 .login-card  { background:rgba(255,255,255,0.04); border:1px solid rgba(201,168,76,0.3); padding:32px; width:100%; max-width:360px; text-align:center; }
+
+/* FIELD SUB-TABS */
+.field-subtabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.field-subtabs::-webkit-scrollbar { display: none; }
+.field-subtab {
+  background: none;
+  border: none;
+  color: rgba(245,240,232,0.35);
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.field-subtab:hover { color: var(--cream); }
+.field-subtab.active { color: rgba(201,168,76,0.9); border-bottom-color: rgba(201,168,76,0.5); }
 
 /* UNPAID SECTION */
 .unpaid-section {
