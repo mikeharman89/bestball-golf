@@ -299,8 +299,8 @@ async function loadLeaderboard() {
 
 function renderLeaderboard() {
   const t = state.activeTournament;
-  const tabs = ['overall','r1','r2','r3','r4'];
-  const tabLabels = { overall:'Overall', r1:'Round 1', r2:'Round 2', r3:'Round 3', r4:'Round 4' };
+  const tabs = ['overall','r1','r2','r3','r4','field'];
+  const tabLabels = { overall:'Overall', r1:'Round 1', r2:'Round 2', r3:'Round 3', r4:'Round 4', field:'Field' };
 
   const tabsHtml = tabs.map(tab => `
     <button class="round-tab ${state.currentTab===tab?'active':''} ${tab==='overall'?'overall':''}"
@@ -308,6 +308,8 @@ function renderLeaderboard() {
 
   const boardHtml = state.currentTab === 'overall'
     ? buildOverallBoard()
+    : state.currentTab === 'field'
+    ? buildFieldBoard()
     : buildRoundBoard(state.currentTab);
 
   document.getElementById('appRoot').innerHTML = `
@@ -456,6 +458,81 @@ function buildRoundBoard(roundKey) {
   return html;
 }
 
+function buildFieldBoard() {
+  const search = (document.getElementById('searchInput')?.value||'').toLowerCase();
+  const r = detectCurrentRound();
+  const roundKey = r ? 'r'+r : 'r1';
+  const roundLabels = {r1:'Round 1',r2:'Round 2',r3:'Round 3',r4:'Round 4'};
+
+  // Build a row for every player in the Masters feed
+  let players = Object.entries(state.mastersData).map(([name, data]) => {
+    const roundScores = data[roundKey] || [];
+    const perHole = Array(18).fill(null);
+    let cum = 0, started = false;
+    const runningArr = Array(18).fill(null);
+    for (let i=0; i<18; i++) {
+      if (roundScores[i] !== null && roundScores[i] !== undefined) {
+        perHole[i] = roundScores[i] - PARS[i];
+        cum += perHole[i];
+        runningArr[i] = cum;
+        started = true;
+      } else if (started) break;
+    }
+    const played = runningArr.filter(v=>v!==null);
+    const total  = played.length ? played[played.length-1] : null;
+    const thru   = played.length;
+    return { name, runningArr, perHole, total, thru };
+  });
+
+  // Sort by total
+  players.sort((a,b) => {
+    if (a.total===null && b.total===null) return 0;
+    if (a.total===null) return 1; if (b.total===null) return -1;
+    return a.total - b.total;
+  });
+
+  // Assign ranks
+  let rank=1;
+  players.forEach((p,i) => {
+    if (i>0 && p.total!==players[i-1].total) rank=i+1;
+    p.rankNum=rank;
+    p.rankLabel=p.total===null?'—':rank===1?'1st':rank===2?'2nd':rank===3?'3rd':'T'+rank;
+  });
+
+  if (search) players = players.filter(p => p.name.toLowerCase().includes(search));
+
+  const holeNums = Array.from({length:18},(_,i)=>i+1);
+
+  let html = `<div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,0.6);margin-bottom:12px;">
+    Field Leaderboard — ${roundLabels[roundKey]||''}
+    <span style="margin-left:12px;color:rgba(245,240,232,0.3)">${players.length} players</span>
+  </div>
+  <div class="leaderboard">
+    <div class="lb-header" style="grid-template-columns:52px 200px 58px 52px repeat(18,1fr)">
+      <div class="lb-cell">POS</div>
+      <div class="lb-cell" style="padding-left:6px">GOLFER</div>
+      <div class="lb-cell" style="justify-content:center">TOT</div>
+      <div class="lb-cell" style="justify-content:center">THRU</div>
+      ${holeNums.map(h=>`<div class="lb-cell" style="justify-content:center;font-size:9px">${h}</div>`).join('')}
+    </div>`;
+
+  players.forEach(p => {
+    const isTop3 = p.rankNum<=3 && p.total!==null;
+    const holeCells = p.runningArr.map((v,i)=>`<div class="lb-cell hole-score ${holeCls(v,p.runningArr[i-1]??null)}">${fmtHole(v)}</div>`).join('');
+    html += `
+    <div class="lb-row ${isTop3?'top-3':''}" style="grid-template-columns:52px 200px 58px 52px repeat(18,1fr);cursor:default">
+      <div class="lb-cell rank ${p.rankNum<=3&&p.total!==null?'gold':''}">${p.rankLabel}</div>
+      <div class="lb-cell name">${p.name}</div>
+      <div class="lb-cell total ${totalCls(p.total)}">${fmtScore(p.total)}</div>
+      <div class="lb-cell thru">${p.thru>0?p.thru:'—'}</div>
+      ${holeCells}
+    </div>`;
+  });
+
+  html += '</div>';
+  return players.length ? html : '<div class="state-msg">No field data available.</div>';
+}
+
 function buildOverallBoard() {
   const search = (document.getElementById('searchInput')?.value||'').toLowerCase();
 
@@ -564,7 +641,7 @@ function renderPicks(t, existingPick) {
   const tiers     = t.tiers || [];
   const phase     = isWeekend ? 'r2golfers' : 'r1golfers';
   const existing  = existingPick?.[phase] || [];
-  const locked    = t.locked || false;
+  const locked    = isWeekend ? (t.lockedSS || false) : (t.lockedTF || false);
 
   if (locked) {
     document.getElementById('appRoot').innerHTML = `
@@ -736,14 +813,17 @@ function renderAdmin() {
               <div class="atc-status ${tournament.status}">${tournament.status}</div>
             </div>
             <div class="atc-actions">
+              <button class="btn-sm" onclick="navigate('leaderboard', {tournament: ${JSON.stringify(tournament).replace(/"/g,'&quot;')}})">View →</button>
               <button class="btn-sm" onclick="editTournament('${tournament.id}')">Edit</button>
               <button class="btn-sm" onclick="manageTiers('${tournament.id}')">Tiers</button>
-              <button class="btn-sm ${tournament.locked?'btn-sm-red':''}" onclick="toggleLock('${tournament.id}', ${tournament.locked||false})">
-                ${tournament.locked?'🔒 Unlock':'🔓 Lock Picks'}
+              <button class="btn-sm" onclick="managePicks('${tournament.id}')">Picks</button>
+              <button class="btn-sm ${tournament.lockedTF?'btn-sm-red':''}" onclick="toggleLockTF('${tournament.id}', ${tournament.lockedTF||false})">
+                ${tournament.lockedTF?'🔒 T&F':'🔓 Lock T&F'}
+              </button>
+              <button class="btn-sm ${tournament.lockedSS?'btn-sm-red':''}" onclick="toggleLockSS('${tournament.id}', ${tournament.lockedSS||false})">
+                ${tournament.lockedSS?'🔒 S&S':'🔓 Lock S&S'}
               </button>
               <button class="btn-sm" onclick="archiveTournament('${tournament.id}')">Archive</button>
-              <button class="btn-sm" onclick="navigate('leaderboard', {tournament: ${JSON.stringify(tournament).replace(/"/g,'&quot;')}})">View →</button>
-              <button class="btn-sm" onclick="managePicks('${tournament.id}')">Picks</button>
             </div>
           </div>
           <div id="tiers-${tournament.id}" style="display:none"></div>
@@ -772,8 +852,13 @@ async function createTournament() {
   await loadAdmin();
 }
 
-async function toggleLock(id, current) {
-  await updateDoc(doc(db, 'tournaments', id), { locked: !current });
+async function toggleLockTF(id, current) {
+  await updateDoc(doc(db, 'tournaments', id), { lockedTF: !current });
+  await loadAdmin();
+}
+
+async function toggleLockSS(id, current) {
+  await updateDoc(doc(db, 'tournaments', id), { lockedSS: !current });
   await loadAdmin();
 }
 
@@ -1217,7 +1302,8 @@ window.doAdminLogin  = doAdminLogin;
 window.doSignOut     = doSignOut;
 window.showNewTournamentForm = showNewTournamentForm;
 window.createTournament      = createTournament;
-window.toggleLock            = toggleLock;
+window.toggleLockTF          = toggleLockTF;
+window.toggleLockSS          = toggleLockSS;
 window.archiveTournament     = archiveTournament;
 window.manageTiers           = manageTiers;
 window.saveTiers             = saveTiers;
