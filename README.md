@@ -1,4 +1,4 @@
-# ⛳ Best Ball Golf
+# ⛳ [Best Ball Golf](https://mikeharman89.github.io/bestball-golf/)
 
 A live best ball golf pool web app built for friend groups and expanding audiences. Originally built for the Masters Tournament, designed to scale to any PGA Tour event.
 
